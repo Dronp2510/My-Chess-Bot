@@ -30,7 +30,6 @@ while run:
         elif event.type == pygame.VIDEORESIZE:
             window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
-    window.fill((0 , 0 , 0))
     chess_board(window)
     pygame.display.flip()
 
