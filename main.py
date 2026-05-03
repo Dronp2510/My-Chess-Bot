@@ -1,4 +1,5 @@
 import pygame
+from valid_moves import *
 
 pygame.init()
 
@@ -7,6 +8,7 @@ window = pygame.display.set_mode((500,500) , pygame.RESIZABLE)
 clock = pygame.time.Clock()
 pygame.display.set_caption("My Chess")
 selected_square = None
+valid_moves = []
 player_turn = "w"
 run = True
 colors = [pygame.Color('white') , pygame.Color('brown')]
@@ -68,6 +70,11 @@ def make_move(board, move):
     board[end_row][end_col] = board[start_row][start_col]
     board[start_row][start_col] = "--"
 
+
+
+
+
+
 def get_valid_moves(board , position):
     row , col = position
     piece = board[row][col]
@@ -83,13 +90,14 @@ def get_valid_moves(board , position):
     if piece_type == 'r':
         pass
     if piece_type == 'kn':
-        pass
+        return get_knight_move(board , row , col , color)
     if piece_type == 'b':
         pass
     if piece_type == 'k':
-        pass
+        return get_king_move(board , row , col , color)
     if piece_type == 'q':
         pass
+    return []
 
 
 # Main Game Loop
@@ -114,25 +122,31 @@ while run:
             col = mouse_pos[0] // square_size
             row = mouse_pos[1] // square_size
             # print("Clicked:", row, col)
+            
 
             if selected_square is None:
                 piece = board[row][col]
 
                 if piece != "--" and piece[0] == player_turn:
                     selected_square = (row, col)
+                    valid_moves = get_valid_moves(board , selected_square)
             else:
-                move = (selected_square, (row, col))
-                make_move(board , move)
-                # print(board)
+                if (row,col) in valid_moves:
+                    move = (selected_square , (row , col))
+                    make_move(board , move)
+
+                    player_turn = 'b' if player_turn == 'w' else 'w'
                 selected_square = None
-                player_turn = "b" if player_turn == "w" else "w"
+                valid_moves = []
 
     
         images = load_images(min(window.get_size()) // 8)
     
-    valid_moves = get_valid_moves(board, selected_square)
     chess_board(window)
+    # highlight_square(window, selected_square)
+    highlight_moves(window, valid_moves)
     draw_pieces(window , board , images , is_white=True)
+
     pygame.display.flip()
 
     clock.tick(60)
