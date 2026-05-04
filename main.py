@@ -24,6 +24,7 @@ board = [
     ["wr","wkn","wb","wq","wk","wb","wkn","wr"]
 ]
 
+
 def chess_board(surface):
 
     WIDTH , HEIGHT = surface.get_size()
@@ -64,15 +65,80 @@ def draw_pieces(surface, board, images, is_white=True):
             if piece != "--":
                 surface.blit(images[piece] , (display_col * square_size, display_row * square_size))
 
+# def make_move(board, move):
+#     (start_row, start_col), (end_row, end_col) = move
+
+#     board[end_row][end_col] = board[start_row][start_col]
+#     board[start_row][start_col] = "--"
+
 def make_move(board, move):
-    (start_row, start_col), (end_row, end_col) = move
+    (sr, sc), (er, ec) = move
+    piece = board[sr][sc]
 
-    board[end_row][end_col] = board[start_row][start_col]
-    board[start_row][start_col] = "--"
+    board[er][ec] = piece
+    board[sr][sc] = "--"
 
+    # update castling rights
+    if piece == "wk":
+        castling_rights["wks"] = False
+        castling_rights["wqs"] = False
+    elif piece == "bk":
+        castling_rights["bks"] = False
+        castling_rights["bqs"] = False
 
+    elif piece == "wr":
+        if sr == 7 and sc == 0:
+            castling_rights["wqs"] = False
+        elif sr == 7 and sc == 7:
+            castling_rights["wks"] = False
 
+    elif piece == "br":
+        if sr == 0 and sc == 0:
+            castling_rights["bqs"] = False
+        elif sr == 0 and sc == 7:
+            castling_rights["bks"] = False
+    # castling move
+    if piece[1:] == "k":
+        if abs(sc - ec) == 2:
+            # king-side
+            if ec == 6:
+                board[er][5] = board[er][7]
+                board[er][7] = "--"
+            # queen-side
+            elif ec == 2:
+                board[er][3] = board[er][0]
+                board[er][0] = "--"
+    
+def get_all_valid_moves(board, color):
+    all_moves = []
 
+    for row in range(8):
+        for col in range(8):
+            piece = board[row][col]
+
+            if piece != "--" and piece[0] == color:
+                moves = get_valid_moves(board, (row, col))
+                if moves:
+                    all_moves.extend(moves)
+
+    return all_moves
+
+def is_in_check(board, color):
+    king_pos = find_king(board, color)
+    enemy_color = 'b' if color == 'w' else 'w'
+
+    return is_square_attacked(board, king_pos[0], king_pos[1], enemy_color)
+
+def get_game_state(board, color):
+    all_moves = get_all_valid_moves(board, color)
+
+    if len(all_moves) == 0:
+        if is_in_check(board, color):
+            return "checkmate"
+        else:
+            return "stalemate"
+
+    return "ongoing"
 
 
 def get_valid_moves(board , position):
@@ -86,18 +152,34 @@ def get_valid_moves(board , position):
     color = piece[0]
 
     if piece_type == 'p':
-        pass
-    if piece_type == 'r':
-        pass
-    if piece_type == 'kn':
-        return get_knight_move(board , row , col , color)
-    if piece_type == 'b':
-        pass
-    if piece_type == 'k':
-        return get_king_move(board , row , col , color)
-    if piece_type == 'q':
-        pass
-    return []
+        moves = get_pawn_move(board , row , col , color)
+    elif piece_type == 'r':
+        moves = get_rook_move(board , row , col , color)
+    elif piece_type == 'kn':
+        moves = get_knight_move(board , row , col , color)
+    elif piece_type == 'b':
+        moves = get_bishop_move(board , row , col , color)
+    elif piece_type == 'k':
+        moves = get_king_move(board , row , col , color)
+        moves += get_castling_moves(board , row , col , color)
+    elif piece_type == 'q':
+        moves = get_queen_move(board , row , col , color)
+    else:
+        moves = []
+    
+    legal_moves = []
+
+    enemy_color = 'b' if color == 'w' else 'w'
+
+    for move in moves:
+        temp_board = make_temp_move(board , (position , move))
+
+        king_pos = find_king(temp_board , color)
+
+        if not is_square_attacked(temp_board , king_pos[0] , king_pos[1] , enemy_color):
+            legal_moves.append(move)
+    
+    return legal_moves
 
 
 # Main Game Loop
@@ -131,16 +213,31 @@ while run:
                     selected_square = (row, col)
                     valid_moves = get_valid_moves(board , selected_square)
             else:
-                if (row,col) in valid_moves:
+                piece = board[row][col]
+                if piece != '--' and piece[0] == player_turn:
+                    selected_square = (row , col)
+                    valid_moves = get_valid_moves(board , selected_square)
+                
+                elif (row , col) in valid_moves:
                     move = (selected_square , (row , col))
                     make_move(board , move)
+                    state = get_game_state(board, player_turn)
+
+                    if state == "checkmate":
+                        print(f"{'White' if player_turn == 'b' else 'Black'} wins by checkmate")
+
+                    elif state == "stalemate":
+                        print("Draw by stalemate")
 
                     player_turn = 'b' if player_turn == 'w' else 'w'
-                selected_square = None
-                valid_moves = []
-
+                    selected_square = None
+                    valid_moves = []
+                
+                else:
+                    selected_square = None
+                    valid_moves = []
     
-        images = load_images(min(window.get_size()) // 8)
+    images = load_images(min(window.get_size()) // 8)
     
     chess_board(window)
     # highlight_square(window, selected_square)
