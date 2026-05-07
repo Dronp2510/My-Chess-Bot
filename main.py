@@ -1,28 +1,20 @@
 import pygame
+from engine.game_state import GameState
+from engine.move import Move
 from valid_moves import *
 
 pygame.init()
-
+gs = GameState()
 
 window = pygame.display.set_mode((500,500) , pygame.RESIZABLE)
 clock = pygame.time.Clock()
 pygame.display.set_caption("My Chess")
 selected_square = None
 valid_moves = []
-player_turn = "w"
 run = True
 colors = [pygame.Color('white') , pygame.Color('brown')]
 
-board = [
-    ["br","bkn","bb","bq","bk","bb","bkn","br"],
-    ["bp","bp","bp","bp","bp","bp","bp","bp"],
-    ["--","--","--","--","--","--","--","--"],
-    ["--","--","--","--","--","--","--","--"],
-    ["--","--","--","--","--","--","--","--"],
-    ["--","--","--","--","--","--","--","--"],
-    ["wp","wp","wp","wp","wp","wp","wp","wp"],
-    ["wr","wkn","wb","wq","wk","wb","wkn","wr"]
-]
+
 
 
 def chess_board(surface):
@@ -44,11 +36,13 @@ def load_images(square_size):
     images = {}
 
     for piece in pieces:
-        img = pygame.image.load(f"D:/Miscelleneous/VisualStudio/My Chess Bot/Assets/{piece}.png").convert_alpha()
+        img = pygame.image.load(f"D:/Miscelleneous/VisualStudio/My Chess Bot/My Chess Bot/Assets/{piece}.png").convert_alpha()
         img = pygame.transform.smoothscale(img, (square_size, square_size))
         images[piece] = img
 
     return images
+
+images = load_images(min(window.get_size()) // 8)
 
 def draw_pieces(surface, board, images, is_white=True):
     WIDTH, HEIGHT = surface.get_size()
@@ -65,49 +59,7 @@ def draw_pieces(surface, board, images, is_white=True):
             if piece != "--":
                 surface.blit(images[piece] , (display_col * square_size, display_row * square_size))
 
-# def make_move(board, move):
-#     (start_row, start_col), (end_row, end_col) = move
 
-#     board[end_row][end_col] = board[start_row][start_col]
-#     board[start_row][start_col] = "--"
-
-def make_move(board, move):
-    (sr, sc), (er, ec) = move
-    piece = board[sr][sc]
-
-    board[er][ec] = piece
-    board[sr][sc] = "--"
-
-    # update castling rights
-    if piece == "wk":
-        castling_rights["wks"] = False
-        castling_rights["wqs"] = False
-    elif piece == "bk":
-        castling_rights["bks"] = False
-        castling_rights["bqs"] = False
-
-    elif piece == "wr":
-        if sr == 7 and sc == 0:
-            castling_rights["wqs"] = False
-        elif sr == 7 and sc == 7:
-            castling_rights["wks"] = False
-
-    elif piece == "br":
-        if sr == 0 and sc == 0:
-            castling_rights["bqs"] = False
-        elif sr == 0 and sc == 7:
-            castling_rights["bks"] = False
-    # castling move
-    if piece[1:] == "k":
-        if abs(sc - ec) == 2:
-            # king-side
-            if ec == 6:
-                board[er][5] = board[er][7]
-                board[er][7] = "--"
-            # queen-side
-            elif ec == 2:
-                board[er][3] = board[er][0]
-                board[er][0] = "--"
     
 def get_all_valid_moves(board, color):
     all_moves = []
@@ -161,7 +113,7 @@ def get_valid_moves(board , position):
         moves = get_bishop_move(board , row , col , color)
     elif piece_type == 'k':
         moves = get_king_move(board , row , col , color)
-        moves += get_castling_moves(board , row , col , color)
+        moves += get_castling_moves(board , row , col , color , gs.castling_rights)
     elif piece_type == 'q':
         moves = get_queen_move(board , row , col , color)
     else:
@@ -171,8 +123,9 @@ def get_valid_moves(board , position):
 
     enemy_color = 'b' if color == 'w' else 'w'
 
-    for move in moves:
-        temp_board = make_temp_move(board , (position , move))
+    for end_square in moves:
+        move = Move(position, end_square, board)
+        temp_board = make_temp_move(board, move)
 
         king_pos = find_king(temp_board , color)
 
@@ -185,6 +138,7 @@ def get_valid_moves(board , position):
 # Main Game Loop
 
 while run:
+    player_turn = 'w' if gs.white_to_move else 'b'
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -207,21 +161,22 @@ while run:
             
 
             if selected_square is None:
-                piece = board[row][col]
+                piece = gs.board[row][col]
 
                 if piece != "--" and piece[0] == player_turn:
                     selected_square = (row, col)
-                    valid_moves = get_valid_moves(board , selected_square)
+                    valid_moves = get_valid_moves(gs.board , selected_square)
             else:
-                piece = board[row][col]
+                piece = gs.board[row][col]
                 if piece != '--' and piece[0] == player_turn:
                     selected_square = (row , col)
-                    valid_moves = get_valid_moves(board , selected_square)
-                
-                elif (row , col) in valid_moves:
-                    move = (selected_square , (row , col))
-                    make_move(board , move)
-                    state = get_game_state(board, player_turn)
+                    valid_moves = get_valid_moves(gs.board , selected_square)
+
+                move = Move(selected_square, (row, col), gs.board)
+                if move in valid_moves:
+                    move = Move(selected_square, (row, col), gs.board)
+                    gs.make_move(move)
+                    state = get_game_state(gs.board, player_turn)
 
                     if state == "checkmate":
                         print(f"{'White' if player_turn == 'b' else 'Black'} wins by checkmate")
@@ -229,20 +184,25 @@ while run:
                     elif state == "stalemate":
                         print("Draw by stalemate")
 
-                    player_turn = 'b' if player_turn == 'w' else 'w'
+                    player_turn = 'w' if gs.white_to_move else 'b'
                     selected_square = None
                     valid_moves = []
                 
                 else:
                     selected_square = None
                     valid_moves = []
-    
-    images = load_images(min(window.get_size()) // 8)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_z:
+
+                gs.undo_move()
+
+                selected_square = None
+                valid_moves = []
     
     chess_board(window)
     # highlight_square(window, selected_square)
     highlight_moves(window, valid_moves)
-    draw_pieces(window , board , images , is_white=True)
+    draw_pieces(window , gs.board , images , is_white=True)
 
     pygame.display.flip()
 

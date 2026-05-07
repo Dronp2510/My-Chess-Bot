@@ -1,12 +1,5 @@
 import pygame
 
-castling_rights = {
-    "wks": True,  # white king-side
-    "wqs": True,  # white queen-side
-    "bks": True,
-    "bqs": True
-}
-
 def find_king(board, color):
     for row in range(8):
         for col in range(8):
@@ -99,38 +92,72 @@ def get_king_move(board , row , col , color):
                 moves.append((new_row , new_col))
     return moves
 
-def get_castling_moves(board, row, col, color):
+def get_castling_moves(board, row, col, color, castling_rights):
+
     moves = []
     enemy = 'b' if color == 'w' else 'w'
 
-    # king must not be in check
+    if board[row][col] != f"{color}k":
+        return moves
+
+    # king cannot castle while in check
     if is_square_attacked(board, row, col, enemy):
         return moves
 
+    # =========================
+    # WHITE CASTLING
+    # =========================
+
     if color == "w":
+
+        # king-side
         if castling_rights["wks"]:
+
             if board[7][5] == "--" and board[7][6] == "--":
+
                 if not is_square_attacked(board, 7, 5, enemy) and \
                    not is_square_attacked(board, 7, 6, enemy):
+
                     moves.append((7, 6))
 
+        # queen-side
         if castling_rights["wqs"]:
-            if board[7][1] == "--" and board[7][2] == "--" and board[7][3] == "--":
+
+            if board[7][1] == "--" and \
+               board[7][2] == "--" and \
+               board[7][3] == "--":
+
                 if not is_square_attacked(board, 7, 2, enemy) and \
                    not is_square_attacked(board, 7, 3, enemy):
+
                     moves.append((7, 2))
 
+    # =========================
+    # BLACK CASTLING
+    # =========================
+
     else:
+
+        # king-side
         if castling_rights["bks"]:
+
             if board[0][5] == "--" and board[0][6] == "--":
+
                 if not is_square_attacked(board, 0, 5, enemy) and \
                    not is_square_attacked(board, 0, 6, enemy):
+
                     moves.append((0, 6))
 
+        # queen-side
         if castling_rights["bqs"]:
-            if board[0][1] == "--" and board[0][2] == "--" and board[0][3] == "--":
+
+            if board[0][1] == "--" and \
+               board[0][2] == "--" and \
+               board[0][3] == "--":
+
                 if not is_square_attacked(board, 0, 2, enemy) and \
                    not is_square_attacked(board, 0, 3, enemy):
+
                     moves.append((0, 2))
 
     return moves
@@ -207,7 +234,11 @@ def get_pawn_move(board , row , col , color):
 def make_temp_move(board, move):
     new_board = [row[:] for row in board]
 
-    (sr, sc), (er, ec) = move
+    sr = move.start_row
+    sc = move.start_col
+
+    er = move.end_row
+    ec = move.end_col
 
     new_board[er][ec] = new_board[sr][sc]
     new_board[sr][sc] = "--"
@@ -221,7 +252,9 @@ def highlight_moves(surface, valid_moves):
     WIDTH, HEIGHT = surface.get_size()
     square_size = min(WIDTH, HEIGHT) // 8
 
-    for row, col in valid_moves:
+    for move in valid_moves:
+        row = move.end_row
+        col = move.end_col
         highlight = pygame.Surface((square_size, square_size))
         highlight.set_alpha(100)
         highlight.fill((0, 0, 255))  # blue
