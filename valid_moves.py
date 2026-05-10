@@ -207,7 +207,7 @@ def get_knight_move(board , row , col , color):
 
     return moves
 
-def get_pawn_move(board , row , col , color):
+def get_pawn_move(board , row , col , color , en_passant_square):
     moves = []
     direction = -1 if color == 'w' else 1
     start_row = 6 if color == 'w' else 1
@@ -228,6 +228,17 @@ def get_pawn_move(board , row , col , color):
         target = board[row + direction][col + 1]
         if target != '--' and target[0] != color:
             moves.append((row + direction , col + 1))
+    
+    # en passant
+    if en_passant_square:
+
+        ep_row, ep_col = en_passant_square
+
+        if row + direction == ep_row:
+
+            if abs(col - ep_col) == 1:
+
+                moves.append((ep_row, ep_col))
     
     return moves
 

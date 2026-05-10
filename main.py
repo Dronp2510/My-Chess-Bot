@@ -104,7 +104,7 @@ def get_valid_moves(board , position):
     color = piece[0]
 
     if piece_type == 'p':
-        moves = get_pawn_move(board , row , col , color)
+        moves = get_pawn_move(board , row , col , color , gs.en_passant_square)
     elif piece_type == 'r':
         moves = get_rook_move(board , row , col , color)
     elif piece_type == 'kn':
@@ -191,6 +191,7 @@ while run:
                 else:
                     selected_square = None
                     valid_moves = []
+                    
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_z:
 

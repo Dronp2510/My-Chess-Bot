@@ -27,7 +27,7 @@ class GameState:
             'bqs': True
         }
 
-        self.en_passent_square = ()
+        self.en_passant_square = ()
 
     def make_move(self, move):
 
@@ -41,6 +41,10 @@ class GameState:
 
         # move piece
         self.board[er][ec] = piece
+
+        if move.is_en_passant_move:
+            self.board[sr][ec] = "--"
+
         self.board[sr][sc] = "--"
 
         # pawn promotion
@@ -97,6 +101,17 @@ class GameState:
                 self.board[er][3] = self.board[er][0]
                 self.board[er][0] = "--"
 
+        # update en passant square
+        if piece[1:] == "p" and abs(sr - er) == 2:
+
+            self.en_passant_square = (
+                (sr + er) // 2,
+                sc
+            )
+
+        else:
+            self.en_passant_square = ()
+        
         self.white_to_move = not self.white_to_move
 
     def undo_move(self):
@@ -117,6 +132,13 @@ class GameState:
 
         # restore captured piece
         self.board[er][ec] = move.piece_captured
+
+        # undo en passant
+        if move.is_en_passant_move:
+
+            self.board[er][ec] = "--"
+
+            self.board[sr][ec] = move.piece_captured
 
         # undo castling rook move
         if move.is_castle_move:

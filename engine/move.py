@@ -52,10 +52,27 @@ class Move:
         # castling
         self.is_castle_move = False
 
+        # en passant
+        self.is_en_passant_move = False
+
+        # castle
         if self.piece_moved[1:] == "k":
             if abs(self.start_col - self.end_col) == 2:
                 self.is_castle_move = True
 
+        # en passant capture
+        if self.piece_moved[1:] == "p":
+
+            if self.start_col != self.end_col and self.piece_captured == "--":
+
+                self.is_en_passant_move = True
+
+                if self.piece_moved[0] == "w":
+                    self.piece_captured = "bp"
+
+                else:
+                    self.piece_captured = "wp"
+        
         # unique move id
         self.move_id = (
             self.start_row * 1000 +
