@@ -214,17 +214,10 @@ class GameState:
         piece_type = piece[1:]
         color = piece[0]
 
-        moves = self.move_functions[piece_type](
-            row,
-            col,
-            color
-        )
+        moves = self.move_functions[piece_type]( row, col, color )
 
         if piece_type == 'k':
             moves += self.get_castling_moves( row, col, color )
-
-        else:
-            moves = []
 
         legal_moves = []
 
@@ -237,11 +230,7 @@ class GameState:
 
             king_pos = self.find_king(color)
 
-            if not self.is_square_attacked(
-                king_pos[0],
-                king_pos[1],
-                enemy_color
-            ):
+            if not self.is_square_attacked( king_pos[0], king_pos[1], enemy_color ):
                 legal_moves.append(move)
 
             self.undo_move()
@@ -277,7 +266,6 @@ class GameState:
         enemy_color = 'b' if current_color == 'w' else 'w'
 
         return self.is_square_attacked(
-            self.board,
             king_pos[0],
             king_pos[1],
             enemy_color
@@ -325,6 +313,7 @@ class GameState:
 
                     piece_type = piece[1:]
 
+                    # pawns handled separately
                     if piece_type == 'p':
 
                         direction = -1 if enemy_color == 'w' else 1
@@ -341,28 +330,9 @@ class GameState:
 
                         moves = attack_squares
 
-                    elif piece_type == 'r':
-
-                        moves = get_rook_move( self.board, r, c, enemy_color )
-
-                    elif piece_type == 'kn':
-
-                        moves = get_knight_move( self.board, r, c, enemy_color )
-
-                    elif piece_type == 'b':
-
-                        moves = get_bishop_move( self.board, r, c, enemy_color )
-
-                    elif piece_type == 'q':
-
-                        moves = get_queen_move( self.board, r, c, enemy_color )
-
-                    elif piece_type == 'k':
-
-                        moves = get_king_move( self.board, r, c, enemy_color )
-
                     else:
-                        moves = []
+
+                        moves = self.move_functions[piece_type]( r, c, enemy_color )
 
                     if (row, col) in moves:
                         return True
