@@ -59,82 +59,6 @@ def draw_pieces(surface, board, images, is_white=True):
             if piece != "--":
                 surface.blit(images[piece] , (display_col * square_size, display_row * square_size))
 
-
-    
-def get_all_valid_moves(board, color):
-    all_moves = []
-
-    for row in range(8):
-        for col in range(8):
-            piece = board[row][col]
-
-            if piece != "--" and piece[0] == color:
-                moves = get_valid_moves(board, (row, col))
-                if moves:
-                    all_moves.extend(moves)
-
-    return all_moves
-
-def is_in_check(board, color):
-    king_pos = find_king(board, color)
-    enemy_color = 'b' if color == 'w' else 'w'
-
-    return is_square_attacked(board, king_pos[0], king_pos[1], enemy_color)
-
-def get_game_state(board, color):
-    all_moves = get_all_valid_moves(board, color)
-
-    if len(all_moves) == 0:
-        if is_in_check(board, color):
-            return "checkmate"
-        else:
-            return "stalemate"
-
-    return "ongoing"
-
-
-def get_valid_moves(board , position):
-    row , col = position
-    piece = board[row][col]
-
-    if piece == '--':
-        return []
-    
-    piece_type = piece[1:]
-    color = piece[0]
-
-    if piece_type == 'p':
-        moves = get_pawn_move(board , row , col , color , gs.en_passant_square)
-    elif piece_type == 'r':
-        moves = get_rook_move(board , row , col , color)
-    elif piece_type == 'kn':
-        moves = get_knight_move(board , row , col , color)
-    elif piece_type == 'b':
-        moves = get_bishop_move(board , row , col , color)
-    elif piece_type == 'k':
-        moves = get_king_move(board , row , col , color)
-        moves += get_castling_moves(board , row , col , color , gs.castling_rights)
-    elif piece_type == 'q':
-        moves = get_queen_move(board , row , col , color)
-    else:
-        moves = []
-    
-    legal_moves = []
-
-    enemy_color = 'b' if color == 'w' else 'w'
-
-    for end_square in moves:
-        move = Move(position, end_square, board)
-        temp_board = make_temp_move(board, move)
-
-        king_pos = find_king(temp_board , color)
-
-        if not is_square_attacked(temp_board , king_pos[0] , king_pos[1] , enemy_color):
-            legal_moves.append(move)
-    
-    return legal_moves
-
-
 # Main Game Loop
 
 while run:
@@ -165,18 +89,18 @@ while run:
 
                 if piece != "--" and piece[0] == player_turn:
                     selected_square = (row, col)
-                    valid_moves = get_valid_moves(gs.board , selected_square)
+                    valid_moves = gs.get_valid_moves(selected_square)
             else:
                 piece = gs.board[row][col]
                 if piece != '--' and piece[0] == player_turn:
                     selected_square = (row , col)
-                    valid_moves = get_valid_moves(gs.board , selected_square)
+                    valid_moves = gs.get_valid_moves(selected_square)
 
                 move = Move(selected_square, (row, col), gs.board)
                 if move in valid_moves:
                     move = Move(selected_square, (row, col), gs.board)
                     gs.make_move(move)
-                    state = get_game_state(gs.board, player_turn)
+                    state = gs.get_game_state()
 
                     if state == "checkmate":
                         print(f"{'White' if player_turn == 'b' else 'Black'} wins by checkmate")

@@ -1,3 +1,5 @@
+from valid_moves import *
+from engine.move import Move
 
 class GameState:
 
@@ -13,6 +15,15 @@ class GameState:
                         ["wp","wp","wp","wp","wp","wp","wp","wp"],
                         ["wr","wkn","wb","wq","wk","wb","wkn","wr"]
                     ]
+
+        self.move_functions = {
+            'p': self.get_pawn_moves,
+            'r': self.get_rook_moves,
+            'kn': self.get_knight_moves,
+            'b': self.get_bishop_moves,
+            'q': self.get_queen_moves,
+            'k': self.get_king_moves
+        }
         
         self.white_to_move = True
         self.move_log = []
@@ -41,6 +52,12 @@ class GameState:
 
         # move piece
         self.board[er][ec] = piece
+
+        # save previous state for undo
+        move.prev_en_passant_square = self.en_passant_square
+
+        move.prev_castling_rights = self.castling_rights.copy()
+
 
         if move.is_en_passant_move:
             self.board[sr][ec] = "--"
@@ -81,6 +98,28 @@ class GameState:
                 self.castling_rights["bqs"] = False
 
             elif sr == 0 and sc == 7:
+                self.castling_rights["bks"] = False
+        
+        # =========================
+        # ROOK CAPTURED
+        # =========================
+
+        captured = move.piece_captured
+
+        if captured == "wr":
+
+            if er == 7 and ec == 0:
+                self.castling_rights["wqs"] = False
+
+            elif er == 7 and ec == 7:
+                self.castling_rights["wks"] = False
+
+        elif captured == "br":
+
+            if er == 0 and ec == 0:
+                self.castling_rights["bqs"] = False
+
+            elif er == 0 and ec == 7:
                 self.castling_rights["bks"] = False
 
         # =========================
@@ -154,6 +193,437 @@ class GameState:
 
                 self.board[er][0] = self.board[er][3]
                 self.board[er][3] = "--"
+            
+        # restore en passant state
+        self.en_passant_square = move.prev_en_passant_square
+
+        # restore castling rights
+        self.castling_rights = move.prev_castling_rights
 
         # switch turns back
         self.white_to_move = not self.white_to_move
+
+    def get_valid_moves(self, position):
+
+        row, col = position
+        piece = self.board[row][col]
+
+        if piece == "--":
+            return []
+
+        piece_type = piece[1:]
+        color = piece[0]
+
+        moves = self.move_functions[piece_type](
+            row,
+            col,
+            color
+        )
+
+        if piece_type == 'k':
+            moves += self.get_castling_moves( row, col, color )
+
+        else:
+            moves = []
+
+        legal_moves = []
+
+        enemy_color = 'b' if color == 'w' else 'w'
+
+        for end_square in moves:
+
+            move = Move(position, end_square, self.board)
+            self.make_move(move)
+
+            king_pos = self.find_king(color)
+
+            if not self.is_square_attacked(
+                king_pos[0],
+                king_pos[1],
+                enemy_color
+            ):
+                legal_moves.append(move)
+
+            self.undo_move()
+
+        return legal_moves
+
+    def get_all_valid_moves(self):
+
+        all_moves = []
+
+        current_color = 'w' if self.white_to_move else 'b'
+
+        for row in range(8):
+            for col in range(8):
+
+                piece = self.board[row][col]
+
+                if piece != "--" and piece[0] == current_color:
+
+                    moves = self.get_valid_moves((row, col))
+
+                    if moves:
+                        all_moves.extend(moves)
+
+        return all_moves
+
+    def is_in_check(self):
+
+        current_color = 'w' if self.white_to_move else 'b'
+
+        king_pos = self.find_king(current_color)
+
+        enemy_color = 'b' if current_color == 'w' else 'w'
+
+        return self.is_square_attacked(
+            self.board,
+            king_pos[0],
+            king_pos[1],
+            enemy_color
+        )
+
+    def get_game_state(self):
+
+        all_moves = self.get_all_valid_moves()
+
+        if len(all_moves) == 0:
+
+            if self.is_in_check():
+
+                self.checkmate = True
+                return "checkmate"
+
+            else:
+
+                self.stalemate = True
+                return "stalemate"
+
+        self.checkmate = False
+        self.stalemate = False
+
+        return "ongoing"
+    
+    def find_king(self, color):
+
+        for row in range(8):
+            for col in range(8):
+
+                if self.board[row][col] == f"{color}k":
+                    return (row, col)
+
+        return None
+
+    def is_square_attacked(self, row, col, enemy_color):
+
+        for r in range(8):
+            for c in range(8):
+
+                piece = self.board[r][c]
+
+                if piece != "--" and piece[0] == enemy_color:
+
+                    piece_type = piece[1:]
+
+                    if piece_type == 'p':
+
+                        direction = -1 if enemy_color == 'w' else 1
+
+                        attack_squares = []
+
+                        if 0 <= r + direction < 8:
+
+                            if 0 <= c - 1 < 8:
+                                attack_squares.append((r + direction, c - 1))
+
+                            if 0 <= c + 1 < 8:
+                                attack_squares.append((r + direction, c + 1))
+
+                        moves = attack_squares
+
+                    elif piece_type == 'r':
+
+                        moves = get_rook_move( self.board, r, c, enemy_color )
+
+                    elif piece_type == 'kn':
+
+                        moves = get_knight_move( self.board, r, c, enemy_color )
+
+                    elif piece_type == 'b':
+
+                        moves = get_bishop_move( self.board, r, c, enemy_color )
+
+                    elif piece_type == 'q':
+
+                        moves = get_queen_move( self.board, r, c, enemy_color )
+
+                    elif piece_type == 'k':
+
+                        moves = get_king_move( self.board, r, c, enemy_color )
+
+                    else:
+                        moves = []
+
+                    if (row, col) in moves:
+                        return True
+
+        return False
+
+    def get_castling_moves(self, row, col, color):
+
+        moves = []
+
+        enemy = 'b' if color == 'w' else 'w'
+
+        if self.board[row][col] != f"{color}k":
+            return moves
+
+        # king cannot castle while in check
+        if self.is_square_attacked(row, col, enemy):
+            return moves
+
+        # WHITE
+        if color == "w":
+
+            # king-side
+            if self.castling_rights["wks"]:
+
+                if self.board[7][5] == "--" and \
+                   self.board[7][6] == "--":
+
+                    if not self.is_square_attacked(7, 5, enemy) and \
+                       not self.is_square_attacked(7, 6, enemy):
+
+                        moves.append((7, 6))
+
+            # queen-side
+            if self.castling_rights["wqs"]:
+
+                if self.board[7][1] == "--" and \
+                   self.board[7][2] == "--" and \
+                   self.board[7][3] == "--":
+
+                    if not self.is_square_attacked(7, 2, enemy) and \
+                       not self.is_square_attacked(7, 3, enemy):
+
+                        moves.append((7, 2))
+
+        # BLACK
+        else:
+
+            # king-side
+            if self.castling_rights["bks"]:
+
+                if self.board[0][5] == "--" and \
+                   self.board[0][6] == "--":
+
+                    if not self.is_square_attacked(0, 5, enemy) and \
+                       not self.is_square_attacked(0, 6, enemy):
+
+                        moves.append((0, 6))
+
+            # queen-side
+            if self.castling_rights["bqs"]:
+
+                if self.board[0][1] == "--" and \
+                   self.board[0][2] == "--" and \
+                   self.board[0][3] == "--":
+
+                    if not self.is_square_attacked(0, 2, enemy) and \
+                       not self.is_square_attacked(0, 3, enemy):
+
+                        moves.append((0, 2))
+
+        return moves
+
+    def loop_moves(self, row, col, color, directions):
+
+        moves = []
+
+        for dr, dc in directions:
+
+            for i in range(1, 8):
+
+                new_row = row + dr * i
+                new_col = col + dc * i
+
+                if not (0 <= new_row < 8 and 0 <= new_col < 8):
+                    break
+
+                target = self.board[new_row][new_col]
+
+                if target == "--":
+
+                    moves.append((new_row, new_col))
+
+                else:
+
+                    if target[0] != color:
+                        moves.append((new_row, new_col))
+
+                    break
+
+        return moves
+
+    def get_rook_moves(self, row, col, color):
+
+        directions = [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ]
+
+        return self.loop_moves(
+            row,
+            col,
+            color,
+            directions
+        )
+
+    def get_bishop_moves(self, row, col, color):
+
+        directions = [
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1)
+        ]
+
+        return self.loop_moves(
+            row,
+            col,
+            color,
+            directions
+        )
+
+    def get_queen_moves(self, row, col, color):
+
+        directions = [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1)
+        ]
+
+        return self.loop_moves(
+            row,
+            col,
+            color,
+            directions
+        )
+
+    def get_knight_moves(self, row, col, color):
+
+        moves = []
+
+        knight_moves = [
+            (2, 1),
+            (2, -1),
+            (-2, 1),
+            (-2, -1),
+            (1, 2),
+            (1, -2),
+            (-1, 2),
+            (-1, -2)
+        ]
+
+        for dr, dc in knight_moves:
+
+            new_row = row + dr
+            new_col = col + dc
+
+            if 0 <= new_row < 8 and 0 <= new_col < 8:
+
+                target = self.board[new_row][new_col]
+
+                if target == "--" or target[0] != color:
+                    moves.append((new_row, new_col))
+
+        return moves
+
+    def get_king_moves(self, row, col, color):
+
+        moves = []
+
+        king_moves = [
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ]
+
+        for dr, dc in king_moves:
+
+            new_row = row + dr
+            new_col = col + dc
+
+            if 0 <= new_row < 8 and 0 <= new_col < 8:
+
+                target = self.board[new_row][new_col]
+
+                if target == "--" or target[0] != color:
+                    moves.append((new_row, new_col))
+
+        return moves
+
+    def get_pawn_moves(self, row, col, color):
+
+        moves = []
+
+        direction = -1 if color == 'w' else 1
+
+        start_row = 6 if color == 'w' else 1
+
+        # single move
+        if 0 <= row + direction < 8 and \
+           self.board[row + direction][col] == "--":
+
+            moves.append((row + direction, col))
+
+            # double move
+            if row == start_row and \
+               self.board[row + 2 * direction][col] == "--":
+
+                moves.append((row + 2 * direction, col))
+
+        # capture left
+        if 0 <= col - 1 < 8 and \
+           0 <= row + direction < 8:
+
+            target = self.board[row + direction][col - 1]
+
+            if target != "--" and target[0] != color:
+
+                moves.append((row + direction, col - 1))
+
+        # capture right
+        if 0 <= col + 1 < 8 and \
+           0 <= row + direction < 8:
+
+            target = self.board[row + direction][col + 1]
+
+            if target != "--" and target[0] != color:
+
+                moves.append((row + direction, col + 1))
+
+        # en passant
+        if self.en_passant_square:
+
+            ep_row, ep_col = self.en_passant_square
+
+            if row + direction == ep_row:
+
+                if abs(col - ep_col) == 1:
+
+                    moves.append((ep_row, ep_col))
+
+        return moves

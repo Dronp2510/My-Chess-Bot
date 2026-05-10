@@ -81,6 +81,10 @@ class Move:
             self.end_col
         )
 
+        # previous game state info
+        self.prev_en_passant_square = ()
+        self.prev_castling_rights = {}
+
     def __eq__(self, other):
 
         if isinstance(other, Move):
