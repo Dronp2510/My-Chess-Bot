@@ -2,9 +2,13 @@ import pygame
 from engine.game_state import GameState
 from engine.move import Move
 from valid_moves import *
+from bots.evaluation import *
+from bots.chess_bot import *
 
 pygame.init()
 gs = GameState()
+# print(evaluate_board(gs))
+
 
 window = pygame.display.set_mode((500,500) , pygame.RESIZABLE)
 clock = pygame.time.Clock()
@@ -13,8 +17,6 @@ selected_square = None
 valid_moves = []
 run = True
 colors = [pygame.Color('white') , pygame.Color('brown')]
-
-
 
 
 def chess_board(surface):
@@ -100,6 +102,13 @@ while run:
                 if move in valid_moves:
                     move = Move(selected_square, (row, col), gs.board)
                     gs.make_move(move)
+
+                    state = gs.get_game_state()
+                    player_turn = 'w' if gs.white_to_move else 'b'
+                    bot_moves = gs.get_all_valid_moves()
+                    bot_move = find_best_move(gs , bot_moves) 
+                    if bot_move:
+                        gs.make_move(bot_move)
                     state = gs.get_game_state()
 
                     if state == "checkmate":
