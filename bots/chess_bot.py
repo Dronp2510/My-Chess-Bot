@@ -1,6 +1,6 @@
 from bots.evaluation import evaluate_board
 
-DEPTH = 2
+DEPTH = 3
 
 def find_best_move(gs, valid_moves):
 
@@ -14,7 +14,7 @@ def find_best_move(gs, valid_moves):
 
             gs.make_move(move)
 
-            score = minimax(gs, DEPTH - 1, False)
+            score = minimax(gs, DEPTH - 1, float('-inf'), float('inf'), False)
 
             gs.undo_move()
 
@@ -31,7 +31,7 @@ def find_best_move(gs, valid_moves):
 
             gs.make_move(move)
 
-            score = minimax(gs, DEPTH - 1, True)
+            score = minimax(gs, DEPTH - 1, float('-inf'), float('inf'), True)
 
             gs.undo_move()
 
@@ -42,16 +42,21 @@ def find_best_move(gs, valid_moves):
 
     return best_move
 
-def minimax(gs, depth, maximizing_player):
-
-    state = gs.get_game_state()
-
-    # terminal node or depth reached
-    if depth == 0 or state != "ongoing":
-
-        return evaluate_board(gs)
+def minimax(gs, depth, alpha, beta, maximizing_player):
 
     valid_moves = gs.get_all_valid_moves()
+
+    # terminal node
+    if depth == 0:
+        return evaluate_board(gs)
+
+    if len(valid_moves) == 0:
+
+        if gs.is_in_check():
+            return evaluate_board(gs)
+
+        else:
+            return 0
 
     # WHITE (maximize)
     if maximizing_player:
@@ -62,11 +67,17 @@ def minimax(gs, depth, maximizing_player):
 
             gs.make_move(move)
 
-            score = minimax(gs, depth - 1, False)
+            score = minimax( gs, depth - 1, alpha, beta, False )
 
             gs.undo_move()
 
             max_score = max(max_score, score)
+
+            alpha = max(alpha, score)
+
+            # PRUNE
+            if beta <= alpha:
+                break
 
         return max_score
 
@@ -79,10 +90,16 @@ def minimax(gs, depth, maximizing_player):
 
             gs.make_move(move)
 
-            score = minimax(gs, depth - 1, True)
+            score = minimax( gs, depth - 1, alpha, beta, True )
 
             gs.undo_move()
 
             min_score = min(min_score, score)
+
+            beta = min(beta, score)
+
+            # PRUNE
+            if beta <= alpha:
+                break
 
         return min_score
