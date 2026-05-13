@@ -1,8 +1,20 @@
 from bots.evaluation import evaluate_board
+import time
 
 DEPTH = 3
 
+nodes_searched = 0
+cutoffs = 0
+
 def find_best_move(gs, valid_moves):
+
+    start_time = time.time()
+
+    global nodes_searched
+    nodes_searched = 0
+
+    global cutoffs
+    cutoffs = 0
 
     best_move = None
 
@@ -40,9 +52,26 @@ def find_best_move(gs, valid_moves):
                 best_score = score
                 best_move = move
 
+    elapsed_time = time.time() - start_time
+    pps = int(nodes_searched / elapsed_time)
+    search_info = {
+    "nodes": nodes_searched,
+    "cutoffs": cutoffs,
+    "time": elapsed_time,
+    "pps": pps
+    }
+    print('Nodes_searched = ' , search_info['nodes'])
+    print('Time elasped = ' , round(search_info['time'], 2), 'seconds')
+    print('Positions per second = ' , search_info['pps'])
+    print('cutoffs = ' , search_info['cutoffs'])
     return best_move
 
 def minimax(gs, depth, alpha, beta, maximizing_player):
+    
+    global nodes_searched
+    nodes_searched += 1
+
+    global cutoffs
 
     valid_moves = gs.get_all_valid_moves()
     valid_moves.sort(
@@ -81,8 +110,9 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
             # PRUNE
             if beta <= alpha:
+                cutoffs += 1
                 break
-
+        
         return max_score
 
     # BLACK (minimize)
@@ -104,6 +134,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
             # PRUNE
             if beta <= alpha:
+                cutoffs += 1
                 break
 
         return min_score
