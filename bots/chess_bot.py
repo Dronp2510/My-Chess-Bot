@@ -45,6 +45,10 @@ def find_best_move(gs, valid_moves):
 def minimax(gs, depth, alpha, beta, maximizing_player):
 
     valid_moves = gs.get_all_valid_moves()
+    valid_moves.sort(
+        key=move_ordering,
+        reverse=True
+    )
 
     # terminal node
     if depth == 0:
@@ -103,3 +107,22 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
                 break
 
         return min_score
+    
+
+def move_ordering(move):
+
+    score = 0
+
+    # captures
+    if move.piece_captured != "--":
+        score += 10
+
+    # promotions
+    if move.is_pawn_promotion:
+        score += 20
+
+    # castling
+    if move.is_castle_move:
+        score += 5
+
+    return score
