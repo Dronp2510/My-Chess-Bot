@@ -326,38 +326,155 @@ class GameState:
 
     def is_square_attacked(self, row, col, enemy_color):
 
-        for r in range(8):
-            for c in range(8):
+        board = self.board
 
-                piece = self.board[r][c]
+        # =========================
+        # PAWN ATTACKS
+        # =========================
 
-                if piece != "--" and piece[0] == enemy_color:
+        if enemy_color == 'w':
 
-                    piece_type = piece[1:]
+            pawn_rows = row + 1
 
-                    # pawns handled separately
-                    if piece_type == 'p':
+            if pawn_rows < 8:
 
-                        direction = -1 if enemy_color == 'w' else 1
+                if col - 1 >= 0 and board[pawn_rows][col - 1] == "wp":
+                    return True
 
-                        attack_squares = []
+                if col + 1 < 8 and board[pawn_rows][col + 1] == "wp":
+                    return True
 
-                        if 0 <= r + direction < 8:
+        else:
 
-                            if 0 <= c - 1 < 8:
-                                attack_squares.append((r + direction, c - 1))
+            pawn_rows = row - 1
 
-                            if 0 <= c + 1 < 8:
-                                attack_squares.append((r + direction, c + 1))
+            if pawn_rows >= 0:
 
-                        moves = attack_squares
+                if col - 1 >= 0 and board[pawn_rows][col - 1] == "bp":
+                    return True
 
-                    else:
+                if col + 1 < 8 and board[pawn_rows][col + 1] == "bp":
+                    return True
 
-                        moves = self.move_functions[piece_type]( r, c, enemy_color )
+        # =========================
+        # KNIGHT ATTACKS
+        # =========================
 
-                    if (row, col) in moves:
+        knight_offsets = [
+            (2, 1),
+            (2, -1),
+            (-2, 1),
+            (-2, -1),
+            (1, 2),
+            (1, -2),
+            (-1, 2),
+            (-1, -2)
+        ]
+
+        enemy_knight = enemy_color + "kn"
+
+        for dr, dc in knight_offsets:
+
+            r = row + dr
+            c = col + dc
+
+            if 0 <= r < 8 and 0 <= c < 8:
+
+                if board[r][c] == enemy_knight:
+                    return True
+
+        # =========================
+        # KING ATTACKS
+        # =========================
+
+        king_offsets = [
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ]
+
+        enemy_king = enemy_color + "k"
+
+        for dr, dc in king_offsets:
+
+            r = row + dr
+            c = col + dc
+
+            if 0 <= r < 8 and 0 <= c < 8:
+
+                if board[r][c] == enemy_king:
+                    return True
+
+        # =========================
+        # ROOK / QUEEN ATTACKS
+        # =========================
+
+        rook_directions = [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ]
+
+        for dr, dc in rook_directions:
+
+            for i in range(1, 8):
+
+                r = row + dr * i
+                c = col + dc * i
+
+                if not (0 <= r < 8 and 0 <= c < 8):
+                    break
+
+                piece = board[r][c]
+
+                if piece == "--":
+                    continue
+
+                if piece[0] == enemy_color:
+
+                    if piece[1:] == "r" or piece[1:] == "q":
                         return True
+
+                break
+
+        # =========================
+        # BISHOP / QUEEN ATTACKS
+        # =========================
+
+        bishop_directions = [
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1)
+        ]
+
+        for dr, dc in bishop_directions:
+
+            for i in range(1, 8):
+
+                r = row + dr * i
+                c = col + dc * i
+
+                if not (0 <= r < 8 and 0 <= c < 8):
+                    break
+
+                piece = board[r][c]
+
+                if piece == "--":
+                    continue
+
+                if piece[0] == enemy_color:
+
+                    if piece[1:] == "b" or piece[1:] == "q":
+                        return True
+
+                break
 
         return False
 
