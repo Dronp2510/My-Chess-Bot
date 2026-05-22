@@ -1,7 +1,7 @@
 from bots.evaluation import evaluate_board
 import time
 
-DEPTH = 3
+MAX_DEPTH = 5
 
 nodes_searched = 0
 cutoffs = 0
@@ -11,59 +11,95 @@ def find_best_move(gs, valid_moves):
     start_time = time.time()
 
     global nodes_searched
-    nodes_searched = 0
-
     global cutoffs
-    cutoffs = 0
 
     best_move = None
 
-    if gs.white_to_move:
+    # Iterative Deepening Loop
+    for current_depth in range(1, MAX_DEPTH + 1):
 
-        best_score = float('-inf')
+        iteration_start = time.time()
 
-        for move in valid_moves:
+        nodes_searched = 0
+        cutoffs = 0
 
-            gs.make_move(move)
+        iteration_best_move = None
 
-            score = minimax(gs, DEPTH - 1, float('-inf'), float('inf'), False)
+        # WHITE to move
+        if gs.white_to_move:
 
-            gs.undo_move()
+            best_score = float('-inf')
 
-            if score > best_score:
+            for move in valid_moves:
 
-                best_score = score
-                best_move = move
+                gs.make_move(move)
 
-    else:
+                score = minimax(
+                    gs,
+                    current_depth - 1,
+                    float('-inf'),
+                    float('inf'),
+                    False
+                )
 
-        best_score = float('inf')
+                gs.undo_move()
 
-        for move in valid_moves:
+                if score > best_score:
 
-            gs.make_move(move)
+                    best_score = score
+                    iteration_best_move = move
 
-            score = minimax(gs, DEPTH - 1, float('-inf'), float('inf'), True)
+        # BLACK to move
+        else:
 
-            gs.undo_move()
+            best_score = float('inf')
 
-            if score < best_score:
+            for move in valid_moves:
 
-                best_score = score
-                best_move = move
+                gs.make_move(move)
 
-    elapsed_time = time.time() - start_time
-    pps = int(nodes_searched / elapsed_time)
-    search_info = {
-    "nodes": nodes_searched,
-    "cutoffs": cutoffs,
-    "time": elapsed_time,
-    "pps": pps
-    }
-    print('Nodes_searched = ' , search_info['nodes'])
-    print('Time elasped = ' , round(search_info['time'], 2), 'seconds')
-    print('Positions per second = ' , search_info['pps'])
-    print('cutoffs = ' , search_info['cutoffs'])
+                score = minimax(
+                    gs,
+                    current_depth - 1,
+                    float('-inf'),
+                    float('inf'),
+                    True
+                )
+
+                gs.undo_move()
+
+                if score < best_score:
+
+                    best_score = score
+                    iteration_best_move = move
+
+        # Save best move from completed iteration
+        best_move = iteration_best_move
+
+        # Root Move Reordering
+        if best_move in valid_moves:
+
+            valid_moves.remove(best_move)
+            valid_moves.insert(0, best_move)
+
+        # Iteration statistics
+        elapsed_time = time.time() - iteration_start
+
+        pps = int(nodes_searched / elapsed_time) if elapsed_time > 0 else 0
+
+        print(f"\n-- Depth {current_depth} --")
+        print("Best Move =", best_move)
+        print("Nodes Searched =", nodes_searched)
+        print("Cutoffs =", cutoffs)
+        print("Time =", round(elapsed_time, 2), "seconds")
+        print("Positions Per Second =", pps)
+
+    total_time = time.time() - start_time
+
+    print("\n===== FINAL SEARCH COMPLETE =====")
+    print("Final Best Move =", best_move)
+    print("Total Time =", round(total_time, 2), "seconds")
+
     return best_move
 
 def minimax(gs, depth, alpha, beta, maximizing_player):

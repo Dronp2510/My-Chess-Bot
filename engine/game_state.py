@@ -15,6 +15,9 @@ class GameState:
                         ["wp","wp","wp","wp","wp","wp","wp","wp"],
                         ["wr","wkn","wb","wq","wk","wb","wkn","wr"]
                     ]
+        
+        self.white_king_pos = (7,4)
+        self.black_king_pos = (0,4)
 
         self.move_functions = {
             'p': self.get_pawn_moves,
@@ -49,6 +52,10 @@ class GameState:
         ec = move.end_col
 
         piece = move.piece_moved
+
+        # saving previous king pos.
+        move.prev_white_king_pos = self.white_king_pos
+        move.prev_black_king_pos = self.black_king_pos
 
         # move piece
         self.board[er][ec] = piece
@@ -151,6 +158,11 @@ class GameState:
         else:
             self.en_passant_square = ()
         
+        if piece == 'wk':
+            self.white_king_pos = (er , ec)
+        elif piece == 'bk':
+            self.black_king_pos = (er , ec)
+
         self.white_to_move = not self.white_to_move
 
     def undo_move(self):
@@ -200,6 +212,10 @@ class GameState:
         # restore castling rights
         self.castling_rights = move.prev_castling_rights
 
+        # restore king positions
+        self.white_king_pos = move.prev_white_king_pos
+        self.black_king_pos = move.prev_black_king_pos
+
         # switch turns back
         self.white_to_move = not self.white_to_move
 
@@ -228,7 +244,10 @@ class GameState:
             move = Move(position, end_square, self.board)
             self.make_move(move)
 
-            king_pos = self.find_king(color)
+            if color == 'w':
+                king_pos = self.white_king_pos
+            else:
+                king_pos = self.black_king_pos
 
             if not self.is_square_attacked( king_pos[0], king_pos[1], enemy_color ):
                 legal_moves.append(move)
@@ -261,7 +280,10 @@ class GameState:
 
         current_color = 'w' if self.white_to_move else 'b'
 
-        king_pos = self.find_king(current_color)
+        if current_color == 'w':
+            king_pos = self.white_king_pos
+        else:
+            king_pos = self.black_king_pos
 
         enemy_color = 'b' if current_color == 'w' else 'w'
 
