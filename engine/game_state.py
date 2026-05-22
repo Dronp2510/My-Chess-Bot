@@ -804,3 +804,21 @@ class GameState:
                     moves.append((ep_row, ep_col))
 
         return moves
+    
+    def move_is_legal(self):
+
+        # side that JUST moved
+        moving_color = 'b' if self.white_to_move else 'w'
+
+        if moving_color == 'w':
+            king_pos = self.white_king_pos
+            enemy_color = 'b'
+        else:
+            king_pos = self.black_king_pos
+            enemy_color = 'w'
+
+        return not self.is_square_attacked(
+            king_pos[0],
+            king_pos[1],
+            enemy_color
+        )

@@ -1,7 +1,7 @@
 from bots.evaluation import evaluate_board
 import time
 
-MAX_DEPTH = 2
+MAX_DEPTH = 5
 
 nodes_searched = 0
 cutoffs = 0
@@ -110,40 +110,52 @@ def find_best_move(gs, valid_moves):
     return best_move
 
 def minimax(gs, depth, alpha, beta, maximizing_player):
-    
+
     global nodes_searched
     nodes_searched += 1
 
     global cutoffs
 
-    valid_moves = gs.get_all_valid_moves()
-    valid_moves.sort(
+    # terminal depth
+    if depth == 0:
+        return evaluate_board(gs)
+
+    pseudo_moves = gs.get_all_pseudo_moves()
+
+    pseudo_moves.sort(
         key=move_ordering,
         reverse=True
     )
 
-    # terminal node
-    if depth == 0:
-        return evaluate_board(gs)
-
-    if len(valid_moves) == 0:
-
-        if gs.is_in_check():
-            return evaluate_board(gs)
-
-        else:
-            return 0
-
+    # =========================
     # WHITE (maximize)
+    # =========================
+
     if maximizing_player:
 
         max_score = float('-inf')
 
-        for move in valid_moves:
+        legal_move_found = False
+
+        for move in pseudo_moves:
 
             gs.make_move(move)
 
-            score = minimax( gs, depth - 1, alpha, beta, False )
+            # legality filtering
+            if not gs.move_is_legal():
+
+                gs.undo_move()
+                continue
+
+            legal_move_found = True
+
+            score = minimax(
+                gs,
+                depth - 1,
+                alpha,
+                beta,
+                False
+            )
 
             gs.undo_move()
 
@@ -151,23 +163,51 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
             alpha = max(alpha, score)
 
-            # PRUNE
+            # alpha-beta prune
             if beta <= alpha:
+
                 cutoffs += 1
                 break
-        
+
+        # checkmate / stalemate
+        if not legal_move_found:
+
+            if gs.is_in_check():
+                return evaluate_board(gs)
+            else:
+                return 0
+
         return max_score
 
+    # =========================
     # BLACK (minimize)
+    # =========================
+
     else:
 
         min_score = float('inf')
 
-        for move in valid_moves:
+        legal_move_found = False
+
+        for move in pseudo_moves:
 
             gs.make_move(move)
 
-            score = minimax( gs, depth - 1, alpha, beta, True )
+            # legality filtering
+            if not gs.move_is_legal():
+
+                gs.undo_move()
+                continue
+
+            legal_move_found = True
+
+            score = minimax(
+                gs,
+                depth - 1,
+                alpha,
+                beta,
+                True
+            )
 
             gs.undo_move()
 
@@ -175,10 +215,19 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
             beta = min(beta, score)
 
-            # PRUNE
+            # alpha-beta prune
             if beta <= alpha:
+
                 cutoffs += 1
                 break
+
+        # checkmate / stalemate
+        if not legal_move_found:
+
+            if gs.is_in_check():
+                return evaluate_board(gs)
+            else:
+                return 0
 
         return min_score
     
