@@ -1,14 +1,14 @@
 
 piece_score = {
-    'p' : 1 ,
-    'kn': 3 ,
-    'b' : 3.5,
-    'r' : 5 ,
-    'q' : 9 ,
+    'p' : 100 ,
+    'kn': 300 ,
+    'b' : 350 ,
+    'r' : 500 ,
+    'q' : 900 ,
     'k' : 0 
 }
 
-CHECKMATE = 1000
+CHECKMATE = 100000
 STALEMATE = 0
 
 def evaluate_board(gs):

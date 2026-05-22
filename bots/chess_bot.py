@@ -1,4 +1,4 @@
-from bots.evaluation import evaluate_board
+from bots.evaluation import evaluate_board , piece_score
 import time
 
 MAX_DEPTH = 5
@@ -236,16 +236,26 @@ def move_ordering(move):
 
     score = 0
 
-    # captures
+    attacker = move.piece_moved[1:]
+    victim = move.piece_captured[1:]
+
+    # =========================
+    # MVV-LVA CAPTURE SCORING
+    # =========================
+
     if move.piece_captured != "--":
-        score += 10
+
+        victim_value = piece_score[victim]
+        attacker_value = piece_score[attacker]
+
+        score += (10 * victim_value) - attacker_value
 
     # promotions
     if move.is_pawn_promotion:
-        score += 20
+        score += 800
 
     # castling
     if move.is_castle_move:
-        score += 5
+        score += 50
 
     return score
