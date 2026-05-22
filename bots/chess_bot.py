@@ -1,7 +1,7 @@
 from bots.evaluation import evaluate_board
 import time
 
-MAX_DEPTH = 5
+MAX_DEPTH = 2
 
 nodes_searched = 0
 cutoffs = 0
@@ -99,6 +99,13 @@ def find_best_move(gs, valid_moves):
     print("\n===== FINAL SEARCH COMPLETE =====")
     print("Final Best Move =", best_move)
     print("Total Time =", round(total_time, 2), "seconds")
+
+    print("\n------------function call counters------------")
+    print("Make Move Calls =", gs.make_move_calls)
+    print("Undo Move Calls =", gs.undo_move_calls)
+    print("Attack Calls =", gs.attack_calls)
+    print("Valid Move Calls =", gs.valid_move_calls)
+    print("All Valid Move Calls =", gs.all_valid_move_calls)
 
     return best_move
 

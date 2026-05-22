@@ -43,8 +43,16 @@ class GameState:
 
         self.en_passant_square = ()
 
-    def make_move(self, move):
+        self.make_move_calls = 0
+        self.undo_move_calls = 0
+        self.attack_calls = 0
+        self.valid_move_calls = 0
+        self.all_valid_move_calls = 0
 
+    def make_move(self, move):
+        # counting calls 
+        self.make_move_calls += 1
+        
         sr = move.start_row
         sc = move.start_col
 
@@ -166,6 +174,8 @@ class GameState:
         self.white_to_move = not self.white_to_move
 
     def undo_move(self):
+        # counting calls
+        self.undo_move_calls += 1
 
         if len(self.move_log) == 0:
             return
@@ -219,9 +229,10 @@ class GameState:
         # switch turns back
         self.white_to_move = not self.white_to_move
 
-    def get_valid_moves(self, position):
+    def get_pseudo_moves(self, position):
 
         row, col = position
+
         piece = self.board[row][col]
 
         if piece == "--":
@@ -230,18 +241,67 @@ class GameState:
         piece_type = piece[1:]
         color = piece[0]
 
-        moves = self.move_functions[piece_type]( row, col, color )
+        moves = self.move_functions[piece_type](
+            row,
+            col,
+            color
+        )
 
+        # add castling pseudo moves
         if piece_type == 'k':
-            moves += self.get_castling_moves( row, col, color )
+            moves += self.get_castling_moves(
+                row,
+                col,
+                color
+            )
 
-        legal_moves = []
-
-        enemy_color = 'b' if color == 'w' else 'w'
+        pseudo_moves = []
 
         for end_square in moves:
 
-            move = Move(position, end_square, self.board)
+            pseudo_moves.append(
+                Move(position, end_square, self.board)
+            )
+
+        return pseudo_moves
+    
+    def get_all_pseudo_moves(self):
+
+        all_moves = []
+
+        current_color = 'w' if self.white_to_move else 'b'
+
+        for row in range(8):
+            for col in range(8):
+
+                piece = self.board[row][col]
+
+                if piece != "--" and piece[0] == current_color:
+
+                    moves = self.get_pseudo_moves((row, col))
+
+                    if moves:
+                        all_moves.extend(moves)
+
+        return all_moves
+    
+    def get_valid_moves(self, position):
+
+        legal_moves = []
+
+        piece = self.board[position[0]][position[1]]
+
+        if piece == "--":
+            return legal_moves
+
+        color = piece[0]
+
+        enemy_color = 'b' if color == 'w' else 'w'
+
+        pseudo_moves = self.get_pseudo_moves(position)
+
+        for move in pseudo_moves:
+
             self.make_move(move)
 
             if color == 'w':
@@ -249,7 +309,11 @@ class GameState:
             else:
                 king_pos = self.black_king_pos
 
-            if not self.is_square_attacked( king_pos[0], king_pos[1], enemy_color ):
+            if not self.is_square_attacked(
+                king_pos[0],
+                king_pos[1],
+                enemy_color
+            ):
                 legal_moves.append(move)
 
             self.undo_move()
@@ -257,6 +321,8 @@ class GameState:
         return legal_moves
 
     def get_all_valid_moves(self):
+        # counting calls
+        self.all_valid_move_calls += 1
 
         all_moves = []
 
@@ -325,6 +391,8 @@ class GameState:
         return None
 
     def is_square_attacked(self, row, col, enemy_color):
+        # counting calls
+        self.attack_calls += 1
 
         board = self.board
 
