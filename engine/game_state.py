@@ -822,3 +822,229 @@ class GameState:
             king_pos[1],
             enemy_color
         )
+
+    def get_all_capture_moves(self):
+
+        moves = []
+
+        for row in range(8):
+            for col in range(8):
+
+                piece = self.board[row][col]
+
+                if piece == '--':
+                    continue
+
+                color = piece[0]
+
+                if (color == 'w' and self.white_to_move) or \
+                (color == 'b' and not self.white_to_move):
+
+                    piece_type = piece[1:]
+
+                    if piece_type == 'p':
+                        self.get_pawn_capture_moves(row, col, moves)
+
+                    elif piece_type == 'r':
+                        self.get_rook_capture_moves(row, col, moves)
+
+                    elif piece_type == 'kn':
+                        self.get_knight_capture_moves(row, col, moves)
+
+                    elif piece_type == 'b':
+                        self.get_bishop_capture_moves(row, col, moves)
+
+                    elif piece_type == 'q':
+                        self.get_queen_capture_moves(row, col, moves)
+
+                    elif piece_type == 'k':
+                        self.get_king_capture_moves(row, col, moves)
+
+        return moves
+    
+    def get_pawn_capture_moves(self, row, col, moves):
+
+        piece_color = self.board[row][col][0]
+
+        if piece_color == 'w':
+            directions = [(-1, -1), (-1, 1)]
+            promotion_row = 0
+        else:
+            directions = [(1, -1), (1, 1)]
+            promotion_row = 7
+
+        for dr, dc in directions:
+
+            end_row = row + dr
+            end_col = col + dc
+
+            if 0 <= end_row < 8 and 0 <= end_col < 8:
+
+                end_piece = self.board[end_row][end_col]
+
+                # Normal capture
+                if end_piece != '--' and end_piece[0] != piece_color:
+
+                    is_promotion = end_row == promotion_row
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                            # is_pawn_promotion=is_promotion
+                        )
+                    )
+
+                # En passant
+                elif (end_row, end_col) == self.en_passant_square:
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                            # is_en_passant_move=True
+                        )
+                    )
+
+    def get_knight_capture_moves(self, row, col, moves):
+
+        knight_moves = [
+            (-2,-1), (-2,1),
+            (-1,-2), (-1,2),
+            (1,-2), (1,2),
+            (2,-1), (2,1)
+        ]
+
+        ally_color = self.board[row][col][0]
+
+        for dr, dc in knight_moves:
+
+            end_row = row + dr
+            end_col = col + dc
+
+            if 0 <= end_row < 8 and 0 <= end_col < 8:
+
+                end_piece = self.board[end_row][end_col]
+
+                if end_piece != '--' and end_piece[0] != ally_color:
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                        )
+                    )
+
+    def get_rook_capture_moves(self, row, col, moves):
+
+        directions = [
+            (-1,0),
+            (1,0),
+            (0,-1),
+            (0,1)
+        ]
+
+        ally_color = self.board[row][col][0]
+
+        for dr, dc in directions:
+
+            for i in range(1, 8):
+
+                end_row = row + dr * i
+                end_col = col + dc * i
+
+                if not (0 <= end_row < 8 and 0 <= end_col < 8):
+                    break
+
+                end_piece = self.board[end_row][end_col]
+
+                if end_piece == '--':
+                    continue
+
+                if end_piece[0] != ally_color:
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                        )
+                    )
+
+                break
+
+    def get_bishop_capture_moves(self, row, col, moves):
+
+        directions = [
+            (-1,-1),
+            (1,1),
+            (1,-1),
+            (-1,1)
+        ]
+
+        ally_color = self.board[row][col][0]
+
+        for dr, dc in directions:
+
+            for i in range(1, 8):
+
+                end_row = row + dr * i
+                end_col = col + dc * i
+
+                if not (0 <= end_row < 8 and 0 <= end_col < 8):
+                    break
+
+                end_piece = self.board[end_row][end_col]
+
+                if end_piece == '--':
+                    continue
+
+                if end_piece[0] != ally_color:
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                        )
+                    )
+
+                break
+
+    def get_king_capture_moves(self, row, col, moves):
+
+        king_moves = [
+            (-1,-1), (-1,0), (-1,1),
+            (0,-1),          (0,1),
+            (1,-1),  (1,0),  (1,1)
+        ]
+
+        ally_color = self.board[row][col][0]
+
+        for dr, dc in king_moves:
+
+            end_row = row + dr
+            end_col = col + dc
+
+            if 0 <= end_row < 8 and 0 <= end_col < 8:
+
+                end_piece = self.board[end_row][end_col]
+
+                if end_piece != '--' and end_piece[0] != ally_color:
+
+                    moves.append(
+                        Move(
+                            (row, col),
+                            (end_row, end_col),
+                            self.board
+                        )
+                    )
+
+    def get_queen_capture_moves(self, row, col, moves):
+
+        self.get_rook_capture_moves(row, col, moves)
+        self.get_bishop_capture_moves(row, col, moves)
+

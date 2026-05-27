@@ -5,6 +5,7 @@ MAX_DEPTH = 5
 
 nodes_searched = 0
 cutoffs = 0
+q_nodes = 0
 
 def find_best_move(gs, valid_moves):
 
@@ -93,6 +94,7 @@ def find_best_move(gs, valid_moves):
         print("Cutoffs =", cutoffs)
         print("Time =", round(elapsed_time, 2), "seconds")
         print("Positions Per Second =", pps)
+        print("q search nodes = ", q_nodes)
 
     total_time = time.time() - start_time
 
@@ -118,7 +120,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
     # terminal depth
     if depth == 0:
-        return evaluate_board(gs)
+        return quiescence(gs , alpha , beta)
 
     pseudo_moves = gs.get_all_pseudo_moves()
 
@@ -231,7 +233,6 @@ def minimax(gs, depth, alpha, beta, maximizing_player):
 
         return min_score
     
-
 def move_ordering(move):
 
     score = 0
@@ -259,3 +260,47 @@ def move_ordering(move):
         score += 50
 
     return score
+
+def quiescence(gs, alpha, beta, depth=0):
+    global q_nodes
+    q_nodes += 1
+    max_Q_depth = 8
+    stand_pat = evaluate_board(gs)
+
+    # if depth > 5:
+    #     print("deep q search: ", depth)
+
+    if depth > max_Q_depth:
+        return evaluate_board(gs) 
+    
+    if stand_pat >= beta:
+        return beta
+
+    if stand_pat > alpha:
+        alpha = stand_pat
+
+    capture_moves = gs.get_all_capture_moves()
+
+    capture_moves.sort(key=move_ordering, reverse=True)
+
+    for move in capture_moves:
+
+        gs.make_move(move)
+
+        if not gs.move_is_legal():
+            gs.undo_move()
+            continue
+
+        score = -quiescence(gs, -beta, -alpha, depth + 1)
+
+        gs.undo_move()
+
+        if score >= beta:
+            return beta
+
+        if score > alpha:
+            alpha = score
+        
+
+
+    return alpha
