@@ -2,6 +2,8 @@ from bots.evaluation import evaluate_board , piece_score
 import time
 
 MAX_DEPTH = 5
+MAX_Q_DEPTH = 8
+BIG_DELTA = 900
 
 nodes_searched = 0
 cutoffs = 0
@@ -13,6 +15,7 @@ def find_best_move(gs, valid_moves):
 
     global nodes_searched
     global cutoffs
+    global q_nodes
 
     best_move = None
 
@@ -23,7 +26,7 @@ def find_best_move(gs, valid_moves):
 
         nodes_searched = 0
         cutoffs = 0
-
+        q_nodes = 0
         iteration_best_move = None
 
         # WHITE to move
@@ -262,27 +265,30 @@ def move_ordering(move):
     return score
 
 def quiescence(gs, alpha, beta, depth=0):
+
     global q_nodes
     q_nodes += 1
-    max_Q_depth = 8
-    stand_pat = evaluate_board(gs)
 
-    # if depth > 5:
-    #     print("deep q search: ", depth)
-
-    if depth > max_Q_depth:
+    if depth >= MAX_Q_DEPTH:
         return evaluate_board(gs) 
+    
+    stand_pat = evaluate_board(gs)
     
     if stand_pat >= beta:
         return beta
 
+    if stand_pat + BIG_DELTA < alpha:
+        return alpha
+    
     if stand_pat > alpha:
         alpha = stand_pat
-
+    
     capture_moves = gs.get_all_capture_moves()
 
     capture_moves.sort(key=move_ordering, reverse=True)
+    
 
+    
     for move in capture_moves:
 
         gs.make_move(move)
