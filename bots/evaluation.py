@@ -40,4 +40,4 @@ def evaluate_board(gs):
             else:
                 score -= piece_score[piece_type]
 
-    return score
+    return score if gs.white_to_move else -score

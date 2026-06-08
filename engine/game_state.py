@@ -49,6 +49,10 @@ class GameState:
         self.valid_move_calls = 0
         self.all_valid_move_calls = 0
 
+        # Zobrist Hashing
+        self.position_hash = 0
+        self.initialize_hash()
+
     def make_move(self, move):
         # counting calls 
         self.make_move_calls += 1
@@ -65,8 +69,19 @@ class GameState:
         move.prev_white_king_pos = self.white_king_pos
         move.prev_black_king_pos = self.black_king_pos
 
+        from engine.zobrist import zobrist_piece_keys,side_to_move_key
+
+        self.position_hash ^= zobrist_piece_keys[piece][sr][sc]
+        if move.piece_captured != '--':
+            captured = move.piece_captured
+            self.position_hash ^= zobrist_piece_keys[captured][er][ec]
+
         # move piece
         self.board[er][ec] = piece
+
+        final_piece = self.board[er][ec]
+        self.position_hash ^= zobrist_piece_keys[final_piece][er][ec]
+        self.position_hash ^= side_to_move_key
 
         # save previous state for undo
         move.prev_en_passant_square = self.en_passant_square
@@ -174,6 +189,9 @@ class GameState:
         self.white_to_move = not self.white_to_move
 
     def undo_move(self):
+
+        self.initialize_hash()
+
         # counting calls
         self.undo_move_calls += 1
 
@@ -379,16 +397,6 @@ class GameState:
         self.stalemate = False
 
         return "ongoing"
-    
-    def find_king(self, color):
-
-        for row in range(8):
-            for col in range(8):
-
-                if self.board[row][col] == f"{color}k":
-                    return (row, col)
-
-        return None
 
     def is_square_attacked(self, row, col, enemy_color):
         # counting calls
@@ -1047,4 +1055,26 @@ class GameState:
 
         self.get_rook_capture_moves(row, col, moves)
         self.get_bishop_capture_moves(row, col, moves)
+
+    def initialize_hash(self):
+
+        from engine.zobrist import (
+            zobrist_piece_keys,
+            side_to_move_key
+        )
+
+        self.position_hash = 0
+
+        for row in range(8):
+            for col in range(8):
+
+                piece = self.board[row][col]
+
+                if piece != "--":
+
+                    self.position_hash ^= \
+                        zobrist_piece_keys[piece][row][col]
+
+        if self.white_to_move:
+            self.position_hash ^= side_to_move_key
 

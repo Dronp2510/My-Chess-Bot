@@ -8,6 +8,13 @@ BIG_DELTA = 900
 nodes_searched = 0
 cutoffs = 0
 q_nodes = 0
+tt_hits = 0
+
+transposition_table = {}
+
+EXACT = 0
+LOWERBOUND = 1
+UPPERBOUND = 2
 
 def find_best_move(gs, valid_moves):
 
@@ -16,10 +23,10 @@ def find_best_move(gs, valid_moves):
     global nodes_searched
     global cutoffs
     global q_nodes
+    global tt_hits
 
     best_move = None
 
-    # Iterative Deepening Loop
     for current_depth in range(1, MAX_DEPTH + 1):
 
         iteration_start = time.time()
@@ -27,77 +34,59 @@ def find_best_move(gs, valid_moves):
         nodes_searched = 0
         cutoffs = 0
         q_nodes = 0
+        tt_hits = 0
+
+        best_score = float('-inf')
         iteration_best_move = None
 
-        # WHITE to move
-        if gs.white_to_move:
+        valid_moves.sort(
+            key=move_ordering,
+            reverse=True
+        )
 
-            best_score = float('-inf')
+        for move in valid_moves:
 
-            for move in valid_moves:
+            gs.make_move(move)
 
-                gs.make_move(move)
-
-                score = minimax(
-                    gs,
-                    current_depth - 1,
-                    float('-inf'),
-                    float('inf'),
-                    False
-                )
-
+            if not gs.move_is_legal():
                 gs.undo_move()
+                continue
 
-                if score > best_score:
+            score = -negamax(
+                gs,
+                current_depth - 1,
+                float('-inf'),
+                float('inf')
+            )
 
-                    best_score = score
-                    iteration_best_move = move
+            gs.undo_move()
 
-        # BLACK to move
-        else:
+            if score > best_score:
 
-            best_score = float('inf')
+                best_score = score
+                iteration_best_move = move
 
-            for move in valid_moves:
-
-                gs.make_move(move)
-
-                score = minimax(
-                    gs,
-                    current_depth - 1,
-                    float('-inf'),
-                    float('inf'),
-                    True
-                )
-
-                gs.undo_move()
-
-                if score < best_score:
-
-                    best_score = score
-                    iteration_best_move = move
-
-        # Save best move from completed iteration
         best_move = iteration_best_move
 
-        # Root Move Reordering
+        # root move ordering
         if best_move in valid_moves:
 
             valid_moves.remove(best_move)
             valid_moves.insert(0, best_move)
 
-        # Iteration statistics
         elapsed_time = time.time() - iteration_start
 
         pps = int(nodes_searched / elapsed_time) if elapsed_time > 0 else 0
 
         print(f"\n-- Depth {current_depth} --")
         print("Best Move =", best_move)
+        print("Best Score =", best_score)
         print("Nodes Searched =", nodes_searched)
         print("Cutoffs =", cutoffs)
         print("Time =", round(elapsed_time, 2), "seconds")
         print("Positions Per Second =", pps)
-        print("q search nodes = ", q_nodes)
+        print("Q Nodes =", q_nodes)
+        print("TT Hits =", tt_hits)
 
     total_time = time.time() - start_time
 
@@ -105,144 +94,139 @@ def find_best_move(gs, valid_moves):
     print("Final Best Move =", best_move)
     print("Total Time =", round(total_time, 2), "seconds")
 
-    print("\n------------function call counters------------")
-    print("Make Move Calls =", gs.make_move_calls)
-    print("Undo Move Calls =", gs.undo_move_calls)
-    print("Attack Calls =", gs.attack_calls)
-    print("Valid Move Calls =", gs.valid_move_calls)
-    print("All Valid Move Calls =", gs.all_valid_move_calls)
-
     return best_move
 
-def minimax(gs, depth, alpha, beta, maximizing_player):
+def negamax(gs, depth, alpha, beta):
 
     global nodes_searched
+    global cutoffs
+    global tt_hits
+
     nodes_searched += 1
 
-    global cutoffs
+    tt_move = None
 
-    # terminal depth
     if depth == 0:
-        return quiescence(gs , alpha , beta)
+        return quiescence(gs, alpha, beta)
+
+    alpha_original = alpha
+    beta_original = beta
+
+    hash_key = gs.position_hash
+
+    # =========================
+    # TRANSPOSITION LOOKUP
+    # =========================
+
+    if hash_key in transposition_table:
+
+        tt_depth, tt_score, tt_flag, tt_move = transposition_table[hash_key]
+
+        if tt_depth >= depth:
+
+            tt_hits += 1
+            
+            if tt_flag == EXACT:
+                return tt_score
+
+            elif tt_flag == LOWERBOUND:
+                alpha = max(alpha, tt_score)
+
+            elif tt_flag == UPPERBOUND:
+                beta = min(beta, tt_score)
+
+            if alpha >= beta:
+                return tt_score
 
     pseudo_moves = gs.get_all_pseudo_moves()
 
     pseudo_moves.sort(
-        key=move_ordering,
+        key=lambda move:
+            move_ordering(move, tt_move),
         reverse=True
     )
 
-    # =========================
-    # WHITE (maximize)
-    # =========================
+    best_score = float('-inf')
+    best_move = None
 
-    if maximizing_player:
+    legal_move_found = False
 
-        max_score = float('-inf')
+    for move in pseudo_moves:
 
-        legal_move_found = False
+        gs.make_move(move)
 
-        for move in pseudo_moves:
-
-            gs.make_move(move)
-
-            # legality filtering
-            if not gs.move_is_legal():
-
-                gs.undo_move()
-                continue
-
-            legal_move_found = True
-
-            score = minimax(
-                gs,
-                depth - 1,
-                alpha,
-                beta,
-                False
-            )
+        if not gs.move_is_legal():
 
             gs.undo_move()
+            continue
 
-            max_score = max(max_score, score)
+        legal_move_found = True
 
-            alpha = max(alpha, score)
+        score = -negamax(
+            gs,
+            depth - 1,
+            -beta,
+            -alpha
+        )
 
-            # alpha-beta prune
-            if beta <= alpha:
+        gs.undo_move()
 
-                cutoffs += 1
-                break
+        if score > best_score:
 
-        # checkmate / stalemate
-        if not legal_move_found:
+            best_score = score
+            best_move = move
 
-            if gs.is_in_check():
-                return evaluate_board(gs)
-            else:
-                return 0
+        if score > alpha:
+            alpha = score
 
-        return max_score
+        if alpha >= beta:
+
+            cutoffs += 1
+            break
 
     # =========================
-    # BLACK (minimize)
+    # CHECKMATE / STALEMATE
     # =========================
+
+    if not legal_move_found:
+
+        if gs.is_in_check():
+            return -100000
+
+        return 0
+
+    # =========================
+    # STORE TT ENTRY
+    # =========================
+
+    if best_score <= alpha_original:
+        flag = UPPERBOUND
+
+    elif best_score >= beta_original:
+        flag = LOWERBOUND
 
     else:
+        flag = EXACT
 
-        min_score = float('inf')
+    transposition_table[hash_key] = (
+        depth,
+        best_score,
+        flag,
+        best_move
+    )
 
-        legal_move_found = False
+    return best_score
 
-        for move in pseudo_moves:
-
-            gs.make_move(move)
-
-            # legality filtering
-            if not gs.move_is_legal():
-
-                gs.undo_move()
-                continue
-
-            legal_move_found = True
-
-            score = minimax(
-                gs,
-                depth - 1,
-                alpha,
-                beta,
-                True
-            )
-
-            gs.undo_move()
-
-            min_score = min(min_score, score)
-
-            beta = min(beta, score)
-
-            # alpha-beta prune
-            if beta <= alpha:
-
-                cutoffs += 1
-                break
-
-        # checkmate / stalemate
-        if not legal_move_found:
-
-            if gs.is_in_check():
-                return evaluate_board(gs)
-            else:
-                return 0
-
-        return min_score
     
-def move_ordering(move):
+def move_ordering(move , tt_move = None):
 
     score = 0
 
     attacker = move.piece_moved[1:]
     victim = move.piece_captured[1:]
 
+    if tt_move and move == tt_move:
+        return 1000000
     # =========================
     # MVV-LVA CAPTURE SCORING
     # =========================
