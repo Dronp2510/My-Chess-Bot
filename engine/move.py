@@ -126,6 +126,8 @@ class Move:
         self.prev_en_passant_square = ()
         self.prev_castling_rights = {}
 
+        self.prev_hash = 0
+        
     def __eq__(self, other):
 
         if isinstance(other, Move):

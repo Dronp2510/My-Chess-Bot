@@ -57,31 +57,46 @@ class GameState:
         # counting calls 
         self.make_move_calls += 1
         
+        from engine.zobrist import (
+            zobrist_piece_keys,
+            side_to_move_key,
+            castling_keys,
+            en_passant_keys
+        )
+
         sr = move.start_row
         sc = move.start_col
 
         er = move.end_row
         ec = move.end_col
 
+        move.prev_hash = self.position_hash
         piece = move.piece_moved
+        self.position_hash ^= zobrist_piece_keys[piece][sr][sc]
 
         # saving previous king pos.
         move.prev_white_king_pos = self.white_king_pos
         move.prev_black_king_pos = self.black_king_pos
 
-        from engine.zobrist import zobrist_piece_keys,side_to_move_key
+        # remove old en passant hash
+        if self.en_passant_square:
+            self.position_hash ^= \
+                en_passant_keys[self.en_passant_square[1]]
 
-        self.position_hash ^= zobrist_piece_keys[piece][sr][sc]
-        if move.piece_captured != '--':
-            captured = move.piece_captured
-            self.position_hash ^= zobrist_piece_keys[captured][er][ec]
+        # remove old castling rights hash
+        for right, enabled in self.castling_rights.items():
+            if enabled:
+                self.position_hash ^= castling_keys[right]
+
+        if move.piece_captured != '--' and not move.is_en_passant_move:
+
+            self.position_hash ^= \
+                zobrist_piece_keys[
+                    move.piece_captured
+                ][er][ec]
 
         # move piece
         self.board[er][ec] = piece
-
-        final_piece = self.board[er][ec]
-        self.position_hash ^= zobrist_piece_keys[final_piece][er][ec]
-        self.position_hash ^= side_to_move_key
 
         # save previous state for undo
         move.prev_en_passant_square = self.en_passant_square
@@ -90,15 +105,35 @@ class GameState:
 
 
         if move.is_en_passant_move:
-            self.board[sr][ec] = "--"
+            captured_row = sr
+
+            self.position_hash ^= \
+                zobrist_piece_keys[
+                    move.piece_captured
+                ][captured_row][ec]
+            self.board[sr][ec] = '--'
 
         self.board[sr][sc] = "--"
 
-        # pawn promotion
+        # Pawn promotion
         if move.is_pawn_promotion:
 
             promoted_piece = piece[0] + "q"
+
+            self.position_hash ^= \
+                zobrist_piece_keys[piece][er][ec]
+
             self.board[er][ec] = promoted_piece
+
+            self.position_hash ^= \
+                zobrist_piece_keys[
+                    promoted_piece
+                ][er][ec]
+
+        else:
+
+            self.position_hash ^= \
+                zobrist_piece_keys[piece][er][ec]
 
         self.move_log.append(move)
 
@@ -160,15 +195,29 @@ class GameState:
 
             # king-side
             if ec == 6:
+                rook = self.board[er][7]
 
-                self.board[er][5] = self.board[er][7]
+                self.position_hash ^= \
+                    zobrist_piece_keys[rook][er][7]
+
+                self.board[er][5] = rook
                 self.board[er][7] = "--"
+
+                self.position_hash ^= \
+                    zobrist_piece_keys[rook][er][5]
 
             # queen-side
             elif ec == 2:
+                rook = self.board[er][0]
 
-                self.board[er][3] = self.board[er][0]
+                self.position_hash ^= \
+                    zobrist_piece_keys[rook][er][0]
+
+                self.board[er][3] = rook
                 self.board[er][0] = "--"
+
+                self.position_hash ^= \
+                    zobrist_piece_keys[rook][er][3]
 
         # update en passant square
         if piece[1:] == "p" and abs(sr - er) == 2:
@@ -180,17 +229,28 @@ class GameState:
 
         else:
             self.en_passant_square = ()
-        
+
+        if self.en_passant_square:
+
+            self.position_hash ^= \
+                en_passant_keys[
+                    self.en_passant_square[1]
+                ]
+            
         if piece == 'wk':
             self.white_king_pos = (er , ec)
         elif piece == 'bk':
             self.black_king_pos = (er , ec)
+            
+        for right, enabled in self.castling_rights.items():
 
+            if enabled:
+                self.position_hash ^= castling_keys[right]
+        
+        self.position_hash ^= side_to_move_key
         self.white_to_move = not self.white_to_move
 
-    def undo_move(self):
-
-        self.initialize_hash()
+    def undo_move(self):    
 
         # counting calls
         self.undo_move_calls += 1
@@ -199,6 +259,7 @@ class GameState:
             return
 
         move = self.move_log.pop()
+        self.position_hash = move.prev_hash
 
         sr = move.start_row
         sc = move.start_col
@@ -1060,10 +1121,12 @@ class GameState:
 
         from engine.zobrist import (
             zobrist_piece_keys,
-            side_to_move_key
+            side_to_move_key,
+            castling_keys,
+            en_passant_keys
         )
 
-        self.position_hash = 0
+        h = 0
 
         for row in range(8):
             for col in range(8):
@@ -1071,10 +1134,20 @@ class GameState:
                 piece = self.board[row][col]
 
                 if piece != "--":
-
-                    self.position_hash ^= \
-                        zobrist_piece_keys[piece][row][col]
+                    h ^= zobrist_piece_keys[piece][row][col]
 
         if self.white_to_move:
-            self.position_hash ^= side_to_move_key
+            h ^= side_to_move_key
+
+        for right, enabled in self.castling_rights.items():
+
+            if enabled:
+                h ^= castling_keys[right]
+
+        if self.en_passant_square:
+
+            ep_file = self.en_passant_square[1]
+            h ^= en_passant_keys[ep_file]
+
+        self.position_hash = h
 
