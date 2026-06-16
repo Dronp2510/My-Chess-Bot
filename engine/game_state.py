@@ -1,4 +1,3 @@
-from valid_moves import *
 from engine.move import Move
 
 class GameState:
@@ -119,9 +118,6 @@ class GameState:
         if move.is_pawn_promotion:
 
             promoted_piece = piece[0] + "q"
-
-            self.position_hash ^= \
-                zobrist_piece_keys[piece][er][ec]
 
             self.board[er][ec] = promoted_piece
 
@@ -1150,4 +1146,15 @@ class GameState:
             h ^= en_passant_keys[ep_file]
 
         self.position_hash = h
+
+    def verify_hash(self):
+
+        current = self.position_hash
+
+        self.initialize_hash()
+        rebuilt = self.position_hash
+
+        self.position_hash = current
+
+        return current == rebuilt
 

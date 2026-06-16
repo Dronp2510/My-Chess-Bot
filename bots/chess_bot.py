@@ -9,8 +9,12 @@ nodes_searched = 0
 cutoffs = 0
 q_nodes = 0
 tt_hits = 0
+killer_hits = 0
+history_hits = 0
 
 transposition_table = {}
+killer_moves = {}
+history_table = {}
 
 EXACT = 0
 LOWERBOUND = 1
@@ -24,8 +28,14 @@ def find_best_move(gs, valid_moves):
     global cutoffs
     global q_nodes
     global tt_hits
+    global killer_moves
+    global killer_hits
+    global history_table
+    global history_hits
 
     best_move = None
+    killer_moves = {}
+    history_table = {}
 
     for current_depth in range(1, MAX_DEPTH + 1):
 
@@ -35,6 +45,8 @@ def find_best_move(gs, valid_moves):
         cutoffs = 0
         q_nodes = 0
         tt_hits = 0
+        killer_hits = 0
+        history_hits = 0
 
         best_score = float('-inf')
         iteration_best_move = None
@@ -56,7 +68,8 @@ def find_best_move(gs, valid_moves):
                 gs,
                 current_depth - 1,
                 float('-inf'),
-                float('inf')
+                float('inf'),
+                1
             )
 
             gs.undo_move()
@@ -87,6 +100,8 @@ def find_best_move(gs, valid_moves):
         print("Positions Per Second =", pps)
         print("Q Nodes =", q_nodes)
         print("TT Hits =", tt_hits)
+        print("Killer Hits =", killer_hits)
+        print("History Hits =", history_hits)
 
     total_time = time.time() - start_time
 
@@ -96,11 +111,13 @@ def find_best_move(gs, valid_moves):
 
     return best_move
 
-def negamax(gs, depth, alpha, beta):
+def negamax(gs, depth, alpha, beta, ply=0):
 
     global nodes_searched
     global cutoffs
     global tt_hits
+    global killer_moves
+    global history_table
 
     nodes_searched += 1
 
@@ -142,7 +159,7 @@ def negamax(gs, depth, alpha, beta):
 
     pseudo_moves.sort(
         key=lambda move:
-            move_ordering(move, tt_move),
+            move_ordering(move, tt_move, ply),
         reverse=True
     )
 
@@ -166,7 +183,8 @@ def negamax(gs, depth, alpha, beta):
             gs,
             depth - 1,
             -beta,
-            -alpha
+            -alpha,
+            ply + 1
         )
 
         gs.undo_move()
@@ -182,6 +200,11 @@ def negamax(gs, depth, alpha, beta):
         if alpha >= beta:
 
             cutoffs += 1
+
+            if move.piece_captured == "--" and not move.is_pawn_promotion:
+                store_killer_move(ply, move)
+                store_history_move(move, depth)
+
             break
 
     # =========================
@@ -218,15 +241,37 @@ def negamax(gs, depth, alpha, beta):
     return best_score
 
     
-def move_ordering(move , tt_move = None):
+def move_ordering(move, tt_move=None, ply=0):
 
     score = 0
+    global killer_hits
+    global history_hits
 
     attacker = move.piece_moved[1:]
     victim = move.piece_captured[1:]
 
     if tt_move and move == tt_move:
         return 1000000
+
+    if move.piece_captured == "--" and not move.is_pawn_promotion:
+
+        killers = killer_moves.get(ply)
+
+        if killers:
+
+            if killers[0] and move == killers[0]:
+                killer_hits += 1
+                return 900000
+
+            if killers[1] and move == killers[1]:
+                killer_hits += 1
+                return 800000
+
+        history_score = history_table.get(move_history_key(move), 0)
+
+        if history_score:
+            history_hits += 1
+            score += min(history_score, 700000)
     # =========================
     # MVV-LVA CAPTURE SCORING
     # =========================
@@ -247,6 +292,33 @@ def move_ordering(move , tt_move = None):
         score += 50
 
     return score
+
+def store_killer_move(ply, move):
+
+    killers = killer_moves.setdefault(ply, [None, None])
+
+    if killers[0] == move:
+        return
+
+    killers[1] = killers[0]
+    killers[0] = move
+
+def store_history_move(move, depth):
+
+    key = move_history_key(move)
+    bonus = max(1, depth) * max(1, depth)
+
+    history_table[key] = history_table.get(key, 0) + bonus
+
+def move_history_key(move):
+
+    return (
+        move.piece_moved,
+        move.start_row,
+        move.start_col,
+        move.end_row,
+        move.end_col
+    )
 
 def quiescence(gs, alpha, beta, depth=0):
 
