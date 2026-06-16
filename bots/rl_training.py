@@ -19,8 +19,8 @@ GENERATIONS = 5
 GAMES_PER_PHASE = 100
 POPULATION_SIZE = 8
 MAX_PLIES = 160
-MAX_SEARCH_DEPTH = BOT_SEARCH_DEPTH
-MOVE_TIME_LIMIT = 2.0
+MAX_SEARCH_DEPTH = 3  # BOT_SEARCH_DEPTH
+MOVE_TIME_LIMIT = 0.50
 CHECKMATE_REWARD = 10000
 DRAW_REWARD = 0
 MUTATION_RATE = 0.18
@@ -196,7 +196,7 @@ def find_best_move_timed(gs, weights, rng):
     return find_chess_bot_move(
         gs,
         legal_moves,
-        max_depth=MAX_SEARCH_DEPTH,
+        max_depth=3,
         evaluator=weighted_side_to_move_evaluator,
         time_limit=MOVE_TIME_LIMIT,
         quiet=True,
