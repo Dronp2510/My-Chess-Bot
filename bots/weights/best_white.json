@@ -1,0 +1,57 @@
+{
+  "name": "best_white",
+  "seed": 20260616,
+  "move_time_limit": 2.0,
+  "max_search_depth": 1,
+  "max_plies": 40,
+  "weights": {
+    "p": 100.0,
+    "kn": 300.0,
+    "b": 350.0,
+    "r": 500.0,
+    "q": 900.0,
+    "pst": 1.0,
+    "mobility": 2.126,
+    "bishop_pair": 25.0,
+    "check_pressure": 38.035,
+    "castling_rights": 8.0
+  },
+  "history": [
+    {
+      "generation": 1,
+      "best_white_score": 57.5,
+      "best_black_score": -20.0,
+      "head_to_head": {
+        "white_wins": 0,
+        "black_wins": 0,
+        "draws": 2,
+        "white_reward": 40.0,
+        "black_reward": -40.0
+      },
+      "best_white": {
+        "p": 100.0,
+        "kn": 300.0,
+        "b": 350.0,
+        "r": 500.0,
+        "q": 900.0,
+        "pst": 1.0,
+        "mobility": 2.126,
+        "bishop_pair": 25.0,
+        "check_pressure": 38.035,
+        "castling_rights": 8.0
+      },
+      "best_black": {
+        "p": 96.124,
+        "kn": 300.0,
+        "b": 387.81,
+        "r": 500.0,
+        "q": 900.0,
+        "pst": 0.994,
+        "mobility": 2.0,
+        "bishop_pair": 25.0,
+        "check_pressure": 35.0,
+        "castling_rights": 7.248
+      }
+    }
+  ]
+}
