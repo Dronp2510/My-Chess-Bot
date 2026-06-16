@@ -15,9 +15,9 @@ from bots.evaluation import piece_score, piece_square_tables
 from engine.game_state import GameState
 
 
-GENERATIONS = 5
-GAMES_PER_PHASE = 100
-POPULATION_SIZE = 8
+GENERATIONS = 20
+GAMES_PER_PHASE = 120
+POPULATION_SIZE = 16
 MAX_PLIES = 160
 MAX_SEARCH_DEPTH = 3  # BOT_SEARCH_DEPTH
 MOVE_TIME_LIMIT = 0.50
