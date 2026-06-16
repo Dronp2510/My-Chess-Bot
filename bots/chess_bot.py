@@ -20,9 +20,28 @@ EXACT = 0
 LOWERBOUND = 1
 UPPERBOUND = 2
 
-def find_best_move(gs, valid_moves):
+class SearchTimeout(Exception):
+    pass
 
-    start_time = time.time()
+
+def find_best_move(
+    gs,
+    valid_moves,
+    max_depth=None,
+    evaluator=None,
+    time_limit=None,
+    quiet=False,
+    clear_transposition=False
+):
+
+    start_time = time.perf_counter()
+    deadline = None
+
+    if time_limit is not None:
+        deadline = start_time + time_limit
+
+    search_depth = max_depth if max_depth is not None else MAX_DEPTH
+    evaluator = evaluator or evaluate_board
 
     global nodes_searched
     global cutoffs
@@ -32,14 +51,20 @@ def find_best_move(gs, valid_moves):
     global killer_hits
     global history_table
     global history_hits
+    global transposition_table
 
     best_move = None
     killer_moves = {}
     history_table = {}
 
-    for current_depth in range(1, MAX_DEPTH + 1):
+    if clear_transposition or evaluator is not evaluate_board:
+        transposition_table = {}
 
-        iteration_start = time.time()
+    search_moves = list(valid_moves)
+
+    for current_depth in range(1, search_depth + 1):
+
+        iteration_start = time.perf_counter()
 
         nodes_searched = 0
         cutoffs = 0
@@ -51,67 +76,86 @@ def find_best_move(gs, valid_moves):
         best_score = float('-inf')
         iteration_best_move = None
 
-        valid_moves.sort(
+        search_moves.sort(
             key=move_ordering,
             reverse=True
         )
 
-        for move in valid_moves:
+        try:
+            _check_deadline(deadline)
 
-            gs.make_move(move)
+            for move in search_moves:
 
-            if not gs.move_is_legal():
-                gs.undo_move()
-                continue
+                _check_deadline(deadline)
 
-            score = -negamax(
-                gs,
-                current_depth - 1,
-                float('-inf'),
-                float('inf'),
-                1
-            )
+                gs.make_move(move)
 
-            gs.undo_move()
+                if not gs.move_is_legal():
+                    gs.undo_move()
+                    continue
 
-            if score > best_score:
+                try:
+                    score = -negamax(
+                        gs,
+                        current_depth - 1,
+                        float('-inf'),
+                        float('inf'),
+                        1,
+                        evaluator,
+                        deadline
+                    )
+                finally:
+                    gs.undo_move()
 
-                best_score = score
-                iteration_best_move = move
+                if score > best_score:
 
-        best_move = iteration_best_move
+                    best_score = score
+                    iteration_best_move = move
+
+        except SearchTimeout:
+            break
+
+        if iteration_best_move is not None:
+            best_move = iteration_best_move
 
         # root move ordering
-        if best_move in valid_moves:
+        if best_move in search_moves:
 
-            valid_moves.remove(best_move)
-            valid_moves.insert(0, best_move)
+            search_moves.remove(best_move)
+            search_moves.insert(0, best_move)
 
-        elapsed_time = time.time() - iteration_start
+        elapsed_time = time.perf_counter() - iteration_start
 
         pps = int(nodes_searched / elapsed_time) if elapsed_time > 0 else 0
 
-        print(f"\n-- Depth {current_depth} --")
-        print("Best Move =", best_move)
-        print("Best Score =", best_score)
-        print("Nodes Searched =", nodes_searched)
-        print("Cutoffs =", cutoffs)
-        print("Time =", round(elapsed_time, 2), "seconds")
-        print("Positions Per Second =", pps)
-        print("Q Nodes =", q_nodes)
-        print("TT Hits =", tt_hits)
-        print("Killer Hits =", killer_hits)
-        print("History Hits =", history_hits)
+        if not quiet:
+            print(f"\n-- Depth {current_depth} --")
+            print("Best Move =", best_move)
+            print("Best Score =", best_score)
+            print("Nodes Searched =", nodes_searched)
+            print("Cutoffs =", cutoffs)
+            print("Time =", round(elapsed_time, 2), "seconds")
+            print("Positions Per Second =", pps)
+            print("Q Nodes =", q_nodes)
+            print("TT Hits =", tt_hits)
+            print("Killer Hits =", killer_hits)
+            print("History Hits =", history_hits)
 
-    total_time = time.time() - start_time
+    total_time = time.perf_counter() - start_time
 
-    print("\n===== FINAL SEARCH COMPLETE =====")
-    print("Final Best Move =", best_move)
-    print("Total Time =", round(total_time, 2), "seconds")
+    if not quiet:
+        print("\n===== FINAL SEARCH COMPLETE =====")
+        print("Final Best Move =", best_move)
+        print("Total Time =", round(total_time, 2), "seconds")
 
     return best_move
 
-def negamax(gs, depth, alpha, beta, ply=0):
+def _check_deadline(deadline):
+    if deadline is not None and time.perf_counter() >= deadline:
+        raise SearchTimeout
+
+
+def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None):
 
     global nodes_searched
     global cutoffs
@@ -120,11 +164,13 @@ def negamax(gs, depth, alpha, beta, ply=0):
     global history_table
 
     nodes_searched += 1
+    _check_deadline(deadline)
+    evaluator = evaluator or evaluate_board
 
     tt_move = None
 
     if depth == 0:
-        return quiescence(gs, alpha, beta)
+        return quiescence(gs, alpha, beta, evaluator=evaluator, deadline=deadline)
 
     alpha_original = alpha
     beta_original = beta
@@ -179,15 +225,18 @@ def negamax(gs, depth, alpha, beta, ply=0):
 
         legal_move_found = True
 
-        score = -negamax(
-            gs,
-            depth - 1,
-            -beta,
-            -alpha,
-            ply + 1
-        )
-
-        gs.undo_move()
+        try:
+            score = -negamax(
+                gs,
+                depth - 1,
+                -beta,
+                -alpha,
+                ply + 1,
+                evaluator,
+                deadline
+            )
+        finally:
+            gs.undo_move()
 
         if score > best_score:
 
@@ -320,15 +369,17 @@ def move_history_key(move):
         move.end_col
     )
 
-def quiescence(gs, alpha, beta, depth=0):
+def quiescence(gs, alpha, beta, depth=0, evaluator=None, deadline=None):
 
     global q_nodes
     q_nodes += 1
+    _check_deadline(deadline)
+    evaluator = evaluator or evaluate_board
 
     if depth >= MAX_Q_DEPTH:
-        return evaluate_board(gs) 
+        return evaluator(gs) 
     
-    stand_pat = evaluate_board(gs)
+    stand_pat = evaluator(gs)
     
     if stand_pat >= beta:
         return beta
@@ -353,9 +404,17 @@ def quiescence(gs, alpha, beta, depth=0):
             gs.undo_move()
             continue
 
-        score = -quiescence(gs, -beta, -alpha, depth + 1)
-
-        gs.undo_move()
+        try:
+            score = -quiescence(
+                gs,
+                -beta,
+                -alpha,
+                depth + 1,
+                evaluator,
+                deadline
+            )
+        finally:
+            gs.undo_move()
 
         if score >= beta:
             return beta

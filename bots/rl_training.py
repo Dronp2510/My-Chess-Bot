@@ -2,7 +2,6 @@ import argparse
 import json
 import random
 import sys
-import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from bots.chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
+from bots.chess_bot import find_best_move as find_chess_bot_move
 from bots.evaluation import piece_score, piece_square_tables
 from engine.game_state import GameState
 
@@ -18,7 +19,7 @@ GENERATIONS = 5
 GAMES_PER_PHASE = 100
 POPULATION_SIZE = 8
 MAX_PLIES = 160
-MAX_SEARCH_DEPTH = 2
+MAX_SEARCH_DEPTH = BOT_SEARCH_DEPTH
 MOVE_TIME_LIMIT = 2.0
 CHECKMATE_REWARD = 10000
 DRAW_REWARD = 0
@@ -39,10 +40,6 @@ BASE_WEIGHTS = {
     "check_pressure": 35.0,
     "castling_rights": 8.0
 }
-
-
-class SearchTimeout(Exception):
-    pass
 
 
 def train(
@@ -182,108 +179,29 @@ def play_game(white_weights, black_weights, rng):
 
 
 def find_best_move_timed(gs, weights, rng):
-    deadline = time.perf_counter() + MOVE_TIME_LIMIT
     legal_moves = get_legal_moves(gs)
 
     if not legal_moves:
         return None
 
     rng.shuffle(legal_moves)
-    root_color = "w" if gs.white_to_move else "b"
-    best_move = legal_moves[0]
 
-    for depth in range(1, MAX_SEARCH_DEPTH + 1):
-        if time.perf_counter() >= deadline:
-            break
+    def weighted_side_to_move_evaluator(search_state):
+        return evaluate_weighted(
+            search_state,
+            weights,
+            side_to_move(search_state)
+        )
 
-        try:
-            iteration_best = best_move
-            iteration_score = float("-inf")
-            ordered_moves = order_moves(legal_moves)
-
-            for move in ordered_moves:
-                if time.perf_counter() >= deadline:
-                    raise SearchTimeout
-
-                gs.make_move(move)
-                try:
-                    score = alphabeta(
-                        gs,
-                        depth - 1,
-                        float("-inf"),
-                        float("inf"),
-                        root_color,
-                        weights,
-                        deadline
-                    )
-                finally:
-                    gs.undo_move()
-
-                if score > iteration_score:
-                    iteration_score = score
-                    iteration_best = move
-
-            best_move = iteration_best
-
-        except SearchTimeout:
-            break
-
-    return best_move
-
-
-def alphabeta(gs, depth, alpha, beta, root_color, weights, deadline):
-    if time.perf_counter() >= deadline:
-        raise SearchTimeout
-
-    legal_moves = get_legal_moves(gs)
-
-    if not legal_moves:
-        if gs.is_in_check():
-            return -CHECKMATE_REWARD if side_to_move(gs) == root_color else CHECKMATE_REWARD
-        return DRAW_REWARD
-
-    if depth == 0:
-        return evaluate_weighted(gs, weights, root_color)
-
-    maximizing = side_to_move(gs) == root_color
-    ordered_moves = order_moves(legal_moves)
-
-    if maximizing:
-        value = float("-inf")
-
-        for move in ordered_moves:
-            gs.make_move(move)
-            try:
-                value = max(
-                    value,
-                    alphabeta(gs, depth - 1, alpha, beta, root_color, weights, deadline)
-                )
-            finally:
-                gs.undo_move()
-
-            alpha = max(alpha, value)
-            if alpha >= beta:
-                break
-
-        return value
-
-    value = float("inf")
-
-    for move in ordered_moves:
-        gs.make_move(move)
-        try:
-            value = min(
-                value,
-                alphabeta(gs, depth - 1, alpha, beta, root_color, weights, deadline)
-            )
-        finally:
-            gs.undo_move()
-
-        beta = min(beta, value)
-        if alpha >= beta:
-            break
-
-    return value
+    return find_chess_bot_move(
+        gs,
+        legal_moves,
+        max_depth=MAX_SEARCH_DEPTH,
+        evaluator=weighted_side_to_move_evaluator,
+        time_limit=MOVE_TIME_LIMIT,
+        quiet=True,
+        clear_transposition=True
+    )
 
 
 def evaluate_weighted(gs, weights, perspective):
@@ -399,27 +317,6 @@ def get_legal_moves(gs):
         gs.undo_move()
 
     return legal_moves
-
-
-def order_moves(moves):
-    return sorted(moves, key=move_order_score, reverse=True)
-
-
-def move_order_score(move):
-    score = 0
-
-    if move.piece_captured != "--":
-        victim = move.piece_captured[1:]
-        attacker = move.piece_moved[1:]
-        score += (10 * piece_score[victim]) - piece_score[attacker]
-
-    if move.is_pawn_promotion:
-        score += 800
-
-    if move.is_castle_move:
-        score += 50
-
-    return score
 
 
 def pst_score(piece, row, col):
