@@ -12,6 +12,9 @@ Q_DELTA_MARGIN = 150
 NULL_MOVE_REDUCTION = 2
 NULL_MOVE_MIN_DEPTH = 4
 
+# Late Move Removal
+LMR_MOVE_THRESHOLD = 4
+
 nodes_searched = 0
 cutoffs = 0
 q_nodes = 0
@@ -19,6 +22,7 @@ tt_hits = 0
 q_tt_hits = 0
 killer_hits = 0
 history_hits = 0
+lmr_reductions = 0
 
 transposition_table = {}
 q_transposition_table = {}
@@ -67,6 +71,8 @@ def find_best_move(
     global history_hits
     global transposition_table
     global q_transposition_table
+    global lmr_reductions
+
 
     best_move = None
     killer_moves = {}
@@ -88,7 +94,8 @@ def find_best_move(
         q_tt_hits = 0
         killer_hits = 0
         history_hits = 0
-
+        lmr_reductions = 0
+        
         best_score = float('-inf')
         iteration_best_move = None
 
@@ -150,6 +157,7 @@ def find_best_move(
             print("Q TT Hits =", q_tt_hits)
             print("Killer Hits =", killer_hits)
             print("History Hits =", history_hits)
+            print("LMR Reductions =", lmr_reductions)
 
     total_time = time.perf_counter() - start_time
 
@@ -260,7 +268,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
     best_move = None
     legal_move_found = False
 
-    for move in pseudo_moves:
+    for move_number,move in enumerate(pseudo_moves, start=1):
         gs.make_move(move)
 
         if not gs.move_is_legal():
@@ -270,16 +278,66 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
         legal_move_found = True
 
         try:
-            score = -negamax(
-                gs,
-                depth - 1,
-                -beta,
-                -alpha,
-                ply + 1,
-                evaluator,
-                deadline,
-                allow_null=True
+            # =========================
+            # LMR
+            # =========================
+
+            is_quiet = (
+                move.piece_captured == "--"
+                and not move.is_pawn_promotion
             )
+
+            use_lmr = (
+                depth >= 3
+                and move_number > LMR_MOVE_THRESHOLD
+                and is_quiet
+                and not gs.is_in_check()
+            )
+
+            if use_lmr:
+
+                global lmr_reductions
+                lmr_reductions += 1
+                
+                # reduced search
+                score = -negamax(
+                    gs,
+                    depth - 2,
+                    -alpha - 1,
+                    -alpha,
+                    ply + 1,
+                    evaluator,
+                    deadline,
+                    allow_null=True
+                )
+
+                # re-search if promising
+                if score > alpha:
+
+                    score = -negamax(
+                        gs,
+                        depth - 1,
+                        -beta,
+                        -alpha,
+                        ply + 1,
+                        evaluator,
+                        deadline,
+                        allow_null=True
+                    )
+
+            else:
+
+                score = -negamax(
+                    gs,
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                    ply + 1,
+                    evaluator,
+                    deadline,
+                    allow_null=True
+                )
+
         finally:
             gs.undo_move()
 
