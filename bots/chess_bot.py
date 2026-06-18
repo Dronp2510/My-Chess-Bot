@@ -263,9 +263,13 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None):
     if not legal_move_found:
 
         if gs.is_in_check():
-            return -100000
-
-        return 0
+            best_score = -100000
+        else:
+            best_score = 0
+        
+        transposition_table[hash_key] = (depth , best_score , EXACT , None)
+        
+        return best_score
 
     # =========================
     # STORE TT ENTRY
