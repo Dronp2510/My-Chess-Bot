@@ -5,16 +5,53 @@
   "max_search_depth": 2,
   "max_plies": 160,
   "weights": {
-  "p": 100.0,
-  "kn": 325.0,
-  "b": 370.0,
-  "r": 530.0,
-  "q": 950.0,
-  "pst": 1.30,
-  "mobility": 3.80,
-  "bishop_pair": 45.0,
-  "check_pressure": 60.0,
-  "castling_rights": 18.0
-},
-  "history": []
+    "p": 84.107,
+    "kn": 300.0,
+    "b": 350.0,
+    "r": 500.0,
+    "q": 900.0,
+    "pst": 1.0,
+    "mobility": 2.252,
+    "bishop_pair": 25.0,
+    "check_pressure": 35.0,
+    "castling_rights": 8.0
+  },
+  "history": [
+    {
+      "generation": 1,
+      "best_white_score": 10000.0,
+      "best_black_score": 10000.0,
+      "head_to_head": {
+        "white_wins": 11,
+        "black_wins": 16,
+        "draws": 13,
+        "white_reward": -50007.5,
+        "black_reward": 50007.5
+      },
+      "best_white": {
+        "p": 100.0,
+        "kn": 300.0,
+        "b": 350.0,
+        "r": 467.699,
+        "q": 900.0,
+        "pst": 1.18,
+        "mobility": 1.916,
+        "bishop_pair": 24.771,
+        "check_pressure": 35.0,
+        "castling_rights": 8.0
+      },
+      "best_black": {
+        "p": 84.107,
+        "kn": 300.0,
+        "b": 350.0,
+        "r": 500.0,
+        "q": 900.0,
+        "pst": 1.0,
+        "mobility": 2.252,
+        "bishop_pair": 25.0,
+        "check_pressure": 35.0,
+        "castling_rights": 8.0
+      }
+    }
+  ]
 }

@@ -469,10 +469,12 @@ def select_best(population, scores):
 def score_for(weights, scores):
     data = scores[id(weights)]
 
-    if data["games"] == 0:
+    if data["games"] < 5:
         return float("-inf")
 
-    return data["score"] / data["games"]
+    avg_score = data["score"] / data["games"]
+    
+    return avg_score + data["games"] * 0.001
 
 
 def save_weights(name, weights, history, seed):
