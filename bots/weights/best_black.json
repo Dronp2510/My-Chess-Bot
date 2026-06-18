@@ -1,8 +1,8 @@
 {
   "name": "best_black",
   "seed": 20260616,
-  "move_time_limit": 1.5,
-  "max_search_depth": 4,
+  "move_time_limit": 0.3,
+  "max_search_depth": 2,
   "max_plies": 160,
   "weights": {
   "p": 100.0,

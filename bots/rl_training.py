@@ -15,12 +15,12 @@ from bots.evaluation import piece_score, piece_square_tables
 from engine.game_state import GameState
 
 
-GENERATIONS = 15
+GENERATIONS = 5
 GAMES_PER_PHASE = 60
 POPULATION_SIZE = 16
 MAX_PLIES = 160
-MAX_SEARCH_DEPTH = 4  # BOT_SEARCH_DEPTH
-MOVE_TIME_LIMIT = 1.5
+MAX_SEARCH_DEPTH = 2  # BOT_SEARCH_DEPTH
+MOVE_TIME_LIMIT = 0.3
 CHECKMATE_REWARD = 10000
 DRAW_REWARD = 0
 MUTATION_RATE = 0.25
@@ -41,6 +41,95 @@ BASE_WEIGHTS = {
     "castling_rights": 8.0
 }
 
+OPENING_MOVES = [
+
+    # Italian
+    ["e2e4", "e7e5",
+     "g1f3", "b8c6",
+     "f1c4", "f8c5"],
+
+    # Sicilian
+    ["e2e4", "c7c5",
+     "g1f3", "d7d6",
+     "d2d4", "c5d4"],
+
+    # French
+    ["e2e4", "e7e6",
+     "d2d4", "d7d5",
+     "b1c3", "g8f6"],
+
+    # Caro-Kann
+    ["e2e4", "c7c6",
+     "d2d4", "d7d5",
+     "b1c3", "d5e4"],
+
+    # Queen Gambit
+    ["d2d4", "d7d5",
+     "c2c4", "e7e6",
+     "b1c3", "g8f6"],
+
+    # King's Indian
+    ["d2d4", "g8f6",
+     "c2c4", "g7g6",
+     "b1c3", "f8g7"],
+
+    # White advantage
+    ["e2e4", "e7e5",
+     "f2f4", "e5f4",
+     "g1f3", "g7g5"],
+
+    # Black advantage
+    ["e2e4", "c7c5",
+     "g1f3", "d7d6",
+     "d2d4", "c5d4"]
+]
+
+# HELPER FUNCTIONS
+def square_to_rc(square):
+    file = ord(square[0]) - ord('a')
+    rank = 8 - int(square[1])
+    return rank, file
+
+def move_from_uci(gs, uci):
+
+    start = uci[:2]
+    end = uci[2:4]
+
+    sr, sc = square_to_rc(start)
+    er, ec = square_to_rc(end)
+
+    legal_moves = get_legal_moves(gs)
+
+    for move in legal_moves:
+        if (
+            move.start_row == sr and
+            move.start_col == sc and
+            move.end_row == er and
+            move.end_col == ec
+        ):
+            return move
+
+    return None
+
+def create_random_opening_position(rng):
+
+    gs = GameState()
+
+    opening = rng.choice(OPENING_MOVES)
+    plies_to_play = rng.randint(4, len(opening))
+
+    for uci in opening[:plies_to_play]:
+
+        move = move_from_uci(gs, uci)
+
+        if move is None:
+            break
+
+        gs.make_move(move)
+
+    return gs
+
+#---------------------------------------------------------------
 
 def train(
     generations=GENERATIONS,
@@ -86,11 +175,11 @@ def train(
         history.append(generation_summary)
         print_generation_summary(generation_summary)
 
+        save_weights("best_white", best_white, history, seed)
+        save_weights("best_black", best_black, history, seed)
+        
         white_population = next_population(best_white, rng)
         black_population = next_population(best_black, rng)
-
-    save_weights("best_white", best_white, history, seed)
-    save_weights("best_black", best_black, history, seed)
 
     return best_white, best_black, history
 
@@ -144,7 +233,7 @@ def run_head_to_head(white_weights, black_weights, games, rng):
 
 
 def play_game(white_weights, black_weights, rng):
-    gs = GameState()
+    gs = create_random_opening_position(rng)
     winner = None
     reason = "max_plies"
 
@@ -196,7 +285,7 @@ def find_best_move_timed(gs, weights, rng):
     return find_chess_bot_move(
         gs,
         legal_moves,
-        max_depth=3,
+        max_depth=MAX_SEARCH_DEPTH,
         evaluator=weighted_side_to_move_evaluator,
         time_limit=MOVE_TIME_LIMIT,
         quiet=True,
