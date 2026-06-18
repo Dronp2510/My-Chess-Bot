@@ -42,6 +42,8 @@ class GameState:
 
         self.en_passant_square = ()
 
+        self.null_move_stack = []
+        
         self.make_move_calls = 0
         self.undo_move_calls = 0
         self.attack_calls = 0
@@ -304,6 +306,34 @@ class GameState:
         # switch turns back
         self.white_to_move = not self.white_to_move
 
+    def make_null_move(self):
+        from engine.zobrist import side_to_move_key, en_passant_keys
+
+        # Save only what null-move changes.
+        self.null_move_stack.append((
+            self.position_hash,
+            self.en_passant_square,
+            self.white_to_move
+        ))
+
+        # Remove old en-passant hash if present.
+        if self.en_passant_square:
+            self.position_hash ^= en_passant_keys[self.en_passant_square[1]]
+
+        # Null move clears en passant.
+        self.en_passant_square = ()
+
+        # Toggle side to move.
+        self.position_hash ^= side_to_move_key
+        self.white_to_move = not self.white_to_move
+
+
+    def undo_null_move(self):
+        if not self.null_move_stack:
+            return
+
+        self.position_hash, self.en_passant_square, self.white_to_move = self.null_move_stack.pop()
+    
     def get_pseudo_moves(self, position):
 
         row, col = position
