@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from bots.chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
 from bots.chess_bot import find_best_move as find_chess_bot_move
 from bots.evaluation import piece_score, piece_square_tables
+from bots.bot_profiles import load_weight_profile
 from engine.game_state import GameState
 
 
@@ -137,8 +138,10 @@ def train(
     seed=20260616
 ):
     rng = random.Random(seed)
-    white_population = create_population(rng)
-    black_population = create_population(rng)
+    saved_white = load_weight_profile("best_white", BASE_WEIGHTS)["weights"]
+    saved_black = load_weight_profile("best_black", BASE_WEIGHTS)["weights"]
+    white_population = create_population(rng, saved_white)
+    black_population = create_population(rng, saved_black)
     history = []
     best_white = white_population[0]
     best_black = black_population[0]

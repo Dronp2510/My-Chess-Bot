@@ -1,71 +1,144 @@
 import pygame
+from pathlib import Path
+
 from engine.game_state import GameState
 from engine.move import Move
-from valid_moves import *
-from bots.evaluation import *
-from bots.chess_bot import *
+from valid_moves import highlight_moves
+from bots.chess_bot import (
+    find_best_move,
+    WHITE_BOT_WEIGHTS,
+    BLACK_BOT_WEIGHTS,
+    clear_search_cache,
+)
+from bots.bot_profiles import make_weighted_evaluator
 
 pygame.init()
-gs = GameState()
-# print(evaluate_board(gs))
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+ASSET_CANDIDATES = [
+    PROJECT_ROOT / "Assets",
+    PROJECT_ROOT / "assets",
+]
 
-window = pygame.display.set_mode((500,500) , pygame.RESIZABLE)
-clock = pygame.time.Clock()
-pygame.display.set_caption("My Chess")
-selected_square = None
-valid_moves = []
-run = True
-colors = [pygame.Color('white') , pygame.Color('brown')]
+def resolve_asset_path(piece_name: str) -> Path:
+    for folder in ASSET_CANDIDATES:
+        candidate = folder / f"{piece_name}.png"
+        if candidate.is_file():
+            return candidate
 
+    # Keep a last-resort fallback for older local setups.
+    legacy = Path(r"D:/Miscelleneous/VisualStudio/My Chess Bot/My Chess Bot/Assets") / f"{piece_name}.png"
+    return legacy
 
-def chess_board(surface):
-
-    WIDTH , HEIGHT = surface.get_size()
-    SQUARE_SIZE = min(WIDTH , HEIGHT) // 8
-    for row in range(8):
-        for column in range(8):
-            color = colors[((row + column) % 2)]
-            rect = pygame.Rect(column * SQUARE_SIZE , row * SQUARE_SIZE , SQUARE_SIZE , SQUARE_SIZE)
-            pygame.draw.rect(surface , color , rect)
-    
-    return SQUARE_SIZE
+def opponent(color: str) -> str:
+    return "b" if color == "w" else "w"
 
 def load_images(square_size):
-    pieces = ['wp','wr','wkn','wb','wq','wk',
-              'bp','br','bkn','bb','bq','bk']
-
+    pieces = [
+        "wp", "wr", "wkn", "wb", "wq", "wk",
+        "bp", "br", "bkn", "bb", "bq", "bk",
+    ]
     images = {}
 
     for piece in pieces:
-        img = pygame.image.load(f"D:/Miscelleneous/VisualStudio/My Chess Bot/My Chess Bot/Assets/{piece}.png").convert_alpha()
+        img = pygame.image.load(str(resolve_asset_path(piece))).convert_alpha()
         img = pygame.transform.smoothscale(img, (square_size, square_size))
         images[piece] = img
 
     return images
 
-images = load_images(min(window.get_size()) // 8)
+def chess_board(surface):
+    width, height = surface.get_size()
+    square_size = min(width, height) // 8
+
+    colors = [pygame.Color("white"), pygame.Color("brown")]
+    for row in range(8):
+        for column in range(8):
+            color = colors[(row + column) % 2]
+            rect = pygame.Rect(column * square_size, row * square_size, square_size, square_size)
+            pygame.draw.rect(surface, color, rect)
+
+    return square_size
 
 def draw_pieces(surface, board, images, is_white=True):
-    WIDTH, HEIGHT = surface.get_size()
-    square_size = min(WIDTH, HEIGHT) // 8
+    width, height = surface.get_size()
+    square_size = min(width, height) // 8
 
     for row in range(8):
         for col in range(8):
-
             display_row = row if is_white else 7 - row
             display_col = col if is_white else 7 - col
-
             piece = board[row][col]
-
             if piece != "--":
-                surface.blit(images[piece] , (display_col * square_size, display_row * square_size))
+                surface.blit(images[piece], (display_col * square_size, display_row * square_size))
 
-# Main Game Loop
+def current_turn_color(gs):
+    return "w" if gs.white_to_move else "b"
+
+def bot_weight_profile(bot_color):
+    return WHITE_BOT_WEIGHTS if bot_color == "w" else BLACK_BOT_WEIGHTS
+
+def bot_evaluator(bot_color):
+    return make_weighted_evaluator(bot_weight_profile(bot_color))
+
+def create_game(player_color="w"):
+    gs = GameState()
+    return {
+        "gs": gs,
+        "player_color": player_color,
+        "bot_color": opponent(player_color),
+        "selected_square": None,
+        "valid_moves": [],
+    }
+
+state = create_game("w")
+gs = state["gs"]
+window = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+clock = pygame.time.Clock()
+pygame.display.set_caption("My Chess")
+images = load_images(min(window.get_size()) // 8)
+run = True
+
+def sync_bot_turn():
+    global state, gs
+    if not run:
+        return
+    if gs.get_game_state() != "ongoing":
+        return
+
+    if current_turn_color(gs) != state["bot_color"]:
+        return
+
+    bot_moves = gs.get_all_valid_moves()
+    if not bot_moves:
+        gs.get_game_state()
+        return
+
+    move = find_best_move(
+        gs,
+        bot_moves,
+        evaluator=bot_evaluator(state["bot_color"]),
+        quiet=True,
+        clear_transposition=False,
+    )
+
+    if move:
+        gs.make_move(move)
+
+    state["selected_square"] = None
+    state["valid_moves"] = []
+
+def reset_for_player(player_color: str):
+    global state, gs
+    clear_search_cache()
+    state = create_game(player_color)
+    gs = state["gs"]
+    sync_bot_turn()
+
+# make the opening bot move immediately if the human picked black
+sync_bot_turn()
 
 while run:
-    player_turn = 'w' if gs.white_to_move else 'b'
-
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
@@ -73,73 +146,71 @@ while run:
         elif event.type == pygame.VIDEORESIZE:
             window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
             images = load_images(min(window.get_size()) // 8)
-        
+
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            if gs.get_game_state() != "ongoing":
+                continue
+
+            if current_turn_color(gs) != state["player_color"]:
+                continue
+
             mouse_pos = pygame.mouse.get_pos()
+            width, height = window.get_size()
+            square_size = min(width, height) // 8
 
-            WIDTH, HEIGHT = window.get_size()
-            square_size = min(WIDTH, HEIGHT) // 8
+            raw_col = mouse_pos[0] // square_size
+            raw_row = mouse_pos[1] // square_size
 
+            if not (0 <= raw_row < 8 and 0 <= raw_col < 8):
+                continue
 
-            col = mouse_pos[0] // square_size
-            row = mouse_pos[1] // square_size
-            # print("Clicked:", row, col)
-            
+            if state["player_color"] == "w":
+                col = raw_col
+                row = raw_row
+            else:
+                col = 7 - raw_col
+                row = 7 - raw_row
 
-            if selected_square is None:
+            if state["selected_square"] is None:
                 piece = gs.board[row][col]
-
-                if piece != "--" and piece[0] == player_turn:
-                    selected_square = (row, col)
-                    valid_moves = gs.get_valid_moves(selected_square)
+                if piece != "--" and piece[0] == state["player_color"]:
+                    state["selected_square"] = (row, col)
+                    state["valid_moves"] = gs.get_valid_moves((row, col))
             else:
                 piece = gs.board[row][col]
-                if piece != '--' and piece[0] == player_turn:
-                    selected_square = (row , col)
-                    valid_moves = gs.get_valid_moves(selected_square)
 
-                move = Move(selected_square, (row, col), gs.board)
-                if move in valid_moves:
-                    move = Move(selected_square, (row, col), gs.board)
+                if piece != "--" and piece[0] == state["player_color"]:
+                    state["selected_square"] = (row, col)
+                    state["valid_moves"] = gs.get_valid_moves((row, col))
+                    continue
+
+                move = Move(state["selected_square"], (row, col), gs.board)
+                if move in state["valid_moves"]:
                     gs.make_move(move)
-
-                    state = gs.get_game_state()
-                    player_turn = 'w' if gs.white_to_move else 'b'
-                    bot_moves = gs.get_all_valid_moves()
-                    bot_move = find_best_move(gs , bot_moves) 
-                    if bot_move:
-                        gs.make_move(bot_move)
-                    state = gs.get_game_state()
-
-                    if state == "checkmate":
-                        print(f"{'White' if player_turn == 'b' else 'Black'} wins by checkmate")
-
-                    elif state == "stalemate":
+                    state["selected_square"] = None
+                    state["valid_moves"] = []
+                    sync_bot_turn()
+                    state["selected_square"] = None
+                    state["valid_moves"] = []
+                    game_state = gs.get_game_state()
+                    if game_state == "checkmate":
+                        winner = "White" if not gs.white_to_move else "Black"
+                        print(f"{winner} wins by checkmate")
+                    elif game_state == "stalemate":
                         print("Draw by stalemate")
-
-                    player_turn = 'w' if gs.white_to_move else 'b'
-                    selected_square = None
-                    valid_moves = []
-                
                 else:
-                    selected_square = None
-                    valid_moves = []
-                    
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_z:
+                    state["selected_square"] = None
+                    state["valid_moves"] = []
 
-                gs.undo_move()
+    if gs.get_game_state() == "ongoing":
+        sync_bot_turn()
 
-                selected_square = None
-                valid_moves = []
-    
     chess_board(window)
-    # highlight_square(window, selected_square)
-    highlight_moves(window, valid_moves)
-    draw_pieces(window , gs.board , images , is_white=True)
+    is_white_view = state["player_color"] == "w"
+    highlight_moves(window, state["valid_moves"], is_white=is_white_view)
+    draw_pieces(window, gs.board, images, is_white=is_white_view)
 
     pygame.display.flip()
-
     clock.tick(60)
 
 pygame.quit()

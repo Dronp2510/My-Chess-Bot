@@ -1,5 +1,19 @@
 from bots.evaluation import evaluate_board, piece_score
+from bots.bot_profiles import (
+    DEFAULT_BASE_WEIGHTS,
+    load_weight_profile,
+    make_weighted_evaluator,
+)
 import time
+
+WHITE_BOT_PROFILE = load_weight_profile("best_white", DEFAULT_BASE_WEIGHTS)
+BLACK_BOT_PROFILE = load_weight_profile("best_black", DEFAULT_BASE_WEIGHTS)
+
+WHITE_BOT_WEIGHTS = WHITE_BOT_PROFILE["weights"]
+BLACK_BOT_WEIGHTS = BLACK_BOT_PROFILE["weights"]
+
+WHITE_BOT_EVALUATOR = make_weighted_evaluator(WHITE_BOT_WEIGHTS)
+BLACK_BOT_EVALUATOR = make_weighted_evaluator(BLACK_BOT_WEIGHTS)
 
 MAX_DEPTH = 5
 MAX_Q_DEPTH = 8
@@ -173,6 +187,23 @@ def _check_deadline(deadline):
     if deadline is not None and time.perf_counter() >= deadline:
         raise SearchTimeout
 
+def clear_search_cache():
+    global transposition_table
+    global q_transposition_table
+    global killer_moves
+    global history_table
+
+    transposition_table = {}
+    q_transposition_table = {}
+    killer_moves = {}
+    history_table = {}
+
+
+def get_bot_weights(color: str):
+    return WHITE_BOT_WEIGHTS if color == "w" else BLACK_BOT_WEIGHTS
+
+def get_bot_evaluator(color: str):
+    return WHITE_BOT_EVALUATOR if color == "w" else BLACK_BOT_EVALUATOR
 
 def _has_enough_material_for_null(gs):
     # Avoid null-move pruning in very low-material positions.
