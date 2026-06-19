@@ -135,79 +135,128 @@ def reset_for_player(player_color: str):
     gs = state["gs"]
     sync_bot_turn()
 
-# make the opening bot move immediately if the human picked black
-sync_bot_turn()
 
-while run:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
+def start_chess_battle(player_color="w", path_modifiers=None):
+    global state, gs
 
-        elif event.type == pygame.VIDEORESIZE:
-            window = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
-            images = load_images(min(window.get_size()) // 8)
+    state = create_game(player_color)
+    gs = state["gs"]
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if gs.get_game_state() != "ongoing":
-                continue
+    window = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+    clock = pygame.time.Clock()
+    images = load_images(min(window.get_size()) // 8)
 
-            if current_turn_color(gs) != state["player_color"]:
-                continue
+    sync_bot_turn()
 
-            mouse_pos = pygame.mouse.get_pos()
-            width, height = window.get_size()
-            square_size = min(width, height) // 8
+    run = True
 
-            raw_col = mouse_pos[0] // square_size
-            raw_row = mouse_pos[1] // square_size
+    while run:
+        for event in pygame.event.get():
 
-            if not (0 <= raw_row < 8 and 0 <= raw_col < 8):
-                continue
+            if event.type == pygame.QUIT:
+                return
 
-            if state["player_color"] == "w":
-                col = raw_col
-                row = raw_row
-            else:
-                col = 7 - raw_col
-                row = 7 - raw_row
+            elif event.type == pygame.VIDEORESIZE:
+                window = pygame.display.set_mode(
+                    (event.w, event.h),
+                    pygame.RESIZABLE
+                )
+                images = load_images(
+                    min(window.get_size()) // 8
+                )
 
-            if state["selected_square"] is None:
-                piece = gs.board[row][col]
-                if piece != "--" and piece[0] == state["player_color"]:
-                    state["selected_square"] = (row, col)
-                    state["valid_moves"] = gs.get_valid_moves((row, col))
-            else:
-                piece = gs.board[row][col]
+            elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                if piece != "--" and piece[0] == state["player_color"]:
-                    state["selected_square"] = (row, col)
-                    state["valid_moves"] = gs.get_valid_moves((row, col))
+                if gs.get_game_state() != "ongoing":
                     continue
 
-                move = Move(state["selected_square"], (row, col), gs.board)
-                if move in state["valid_moves"]:
-                    gs.make_move(move)
-                    state["selected_square"] = None
-                    state["valid_moves"] = []
-                    game_state = gs.get_game_state()
-                    if game_state == "checkmate":
-                        winner = "White" if not gs.white_to_move else "Black"
-                        print(f"{winner} wins by checkmate")
-                    elif game_state == "stalemate":
-                        print("Draw by stalemate")
+                if current_turn_color(gs) != state["player_color"]:
+                    continue
+
+                mouse_pos = pygame.mouse.get_pos()
+
+                width, height = window.get_size()
+                square_size = min(width, height) // 8
+
+                raw_col = mouse_pos[0] // square_size
+                raw_row = mouse_pos[1] // square_size
+
+                if not (0 <= raw_row < 8 and 0 <= raw_col < 8):
+                    continue
+
+                if state["player_color"] == "w":
+                    col = raw_col
+                    row = raw_row
                 else:
-                    state["selected_square"] = None
-                    state["valid_moves"] = []
+                    col = 7 - raw_col
+                    row = 7 - raw_row
 
-    if gs.get_game_state() == "ongoing":
-        sync_bot_turn()
+                if state["selected_square"] is None:
 
-    chess_board(window)
-    is_white_view = state["player_color"] == "w"
-    highlight_moves(window, state["valid_moves"], is_white=is_white_view)
-    draw_pieces(window, gs.board, images, is_white=is_white_view)
+                    piece = gs.board[row][col]
 
-    pygame.display.flip()
-    clock.tick(60)
+                    if (
+                        piece != "--"
+                        and piece[0] == state["player_color"]
+                    ):
+                        state["selected_square"] = (row, col)
+                        state["valid_moves"] = gs.get_valid_moves(
+                            (row, col)
+                        )
 
-pygame.quit()
+                else:
+
+                    piece = gs.board[row][col]
+
+                    if (
+                        piece != "--"
+                        and piece[0] == state["player_color"]
+                    ):
+                        state["selected_square"] = (row, col)
+                        state["valid_moves"] = gs.get_valid_moves(
+                            (row, col)
+                        )
+                        continue
+
+                    move = Move(
+                        state["selected_square"],
+                        (row, col),
+                        gs.board
+                    )
+
+                    if move in state["valid_moves"]:
+                        gs.make_move(move)
+                        state["selected_square"] = None
+                        state["valid_moves"] = []
+
+                    else:
+                        state["selected_square"] = None
+                        state["valid_moves"] = []
+
+        if gs.get_game_state() == "ongoing":
+            sync_bot_turn()
+
+        chess_board(window)
+
+        is_white_view = (
+            state["player_color"] == "w"
+        )
+
+        highlight_moves(
+            window,
+            state["valid_moves"],
+            is_white=is_white_view
+        )
+
+        draw_pieces(
+            window,
+            gs.board,
+            images,
+            is_white=is_white_view
+        )
+
+        pygame.display.flip()
+        clock.tick(60)
+
+if __name__ == "__main__":
+    start_chess_battle("w")
