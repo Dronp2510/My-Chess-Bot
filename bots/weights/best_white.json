@@ -1,8 +1,8 @@
 {
   "name": "best_white",
   "seed": 20260616,
-  "move_time_limit": 0.3,
-  "max_search_depth": 2,
+  "move_time_limit": 0.5,
+  "max_search_depth": 4,
   "max_plies": 120,
   "weights": {
     "p": 100.0,

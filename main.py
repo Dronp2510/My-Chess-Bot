@@ -119,7 +119,7 @@ def sync_bot_turn():
         bot_moves,
         evaluator=bot_evaluator(state["bot_color"]),
         quiet=True,
-        clear_transposition=False,
+        clear_transposition=True, # make False for training
     )
 
     if move:
@@ -187,9 +187,6 @@ while run:
                 move = Move(state["selected_square"], (row, col), gs.board)
                 if move in state["valid_moves"]:
                     gs.make_move(move)
-                    state["selected_square"] = None
-                    state["valid_moves"] = []
-                    sync_bot_turn()
                     state["selected_square"] = None
                     state["valid_moves"] = []
                     game_state = gs.get_game_state()
