@@ -1,4 +1,6 @@
 from engine.move import Move
+from engine.fen import board_to_fen, fen_to_board, metadata_to_string, string_to_metadata
+from engine.zobrist import compute_full_hash
 
 class GameState:
 
@@ -54,6 +56,142 @@ class GameState:
         self.position_hash = 0
         self.initialize_hash()
 
+        # FEN Notation
+        self.metadata = {
+            "powers": {},
+            "status_effects": {},
+            "campaign": {},
+        }
+        self.halfmove_clock = 0
+        self.fullmove_number = 1
+
+    def _castling_string(self):
+
+        rights = ""
+
+        if self.castling_rights["wks"]:
+            rights += "K"
+
+        if self.castling_rights["wqs"]:
+            rights += "Q"
+
+        if self.castling_rights["bks"]:
+            rights += "k"
+
+        if self.castling_rights["bqs"]:
+            rights += "q"
+
+        return rights if rights else "-"
+
+    def _enpassant_string(self):
+        if not self.en_passant_square:
+            return "-"
+
+        row, col = self.en_passant_square
+
+        file_char = chr(ord("a") + col)
+        rank_char = str(8 - row)
+
+        return file_char + rank_char
+
+    def to_fen(self):
+        board_part = board_to_fen(self.board)
+
+        stm = "w" if self.white_to_move else "b"
+
+        castling = self._castling_string()
+
+        ep = self._enpassant_string()
+
+        return (
+            f"{board_part} "
+            f"{stm} "
+            f"{castling} "
+            f"{ep} "
+            f"{self.halfmove_clock} "
+            f"{self.fullmove_number}"
+        )
+
+    def to_extended_fen(self):
+
+        base = self.to_fen()
+
+        metadata = metadata_to_string(self.metadata)
+
+        return base + " " + metadata
+
+    def from_fen(self, fen):
+
+        parts = fen.strip().split()
+
+        if len(parts) < 6:
+            raise ValueError("Invalid FEN")
+
+        board_part = parts[0]
+        stm = parts[1]
+        castling = parts[2]
+        ep = parts[3]
+        halfmove = int(parts[4])
+        fullmove = int(parts[5])
+
+        self.board = fen_to_board(board_part)
+
+        self.white_to_move = stm == "w"
+
+        self.halfmove_clock = halfmove
+        self.fullmove_number = fullmove
+
+        self.en_passant_square = ()
+
+        if ep != "-":
+            col = ord(ep[0]) - ord("a")
+            row = 8 - int(ep[1])
+
+            self.en_passant_square = (row, col)
+
+        self.castling_rights["wks"] = "K" in castling
+        self.castling_rights["wqs"] = "Q" in castling
+        self.castling_rights["bks"] = "k" in castling
+        self.castling_rights["bqs"] = "q" in castling
+
+        self.move_log.clear()
+
+        self.metadata = {}
+
+        self._refresh_after_fen()
+
+    def from_extended_fen(self, fen):
+
+        parts = fen.strip().split(maxsplit=6)
+
+        if len(parts) < 6:
+            raise ValueError("Invalid Extended FEN")
+
+        normal_fen = " ".join(parts[:6])
+
+        self.from_fen(normal_fen)
+
+        if len(parts) == 7:
+            self.metadata = string_to_metadata(parts[6])
+
+    def _refresh_after_fen(self):
+
+        self.white_king_pos = None
+        self.black_king_pos = None
+
+        for r in range(8):
+            for c in range(8):
+
+                piece = self.board[r][c]
+
+                if piece == "wk":
+                    self.white_king_pos = (r, c)
+
+                elif piece == "bk":
+                    self.black_king_pos = (r, c)
+
+        self.position_hash = compute_full_hash(self)
+
     def make_move(self, move):
         # counting calls 
         self.make_move_calls += 1
@@ -99,6 +237,17 @@ class GameState:
         # move piece
         self.board[er][ec] = piece
 
+        moved_piece = move.piece_moved
+        captured_piece = move.piece_captured
+
+        if moved_piece[1:] == "p" or captured_piece != "--":
+            self.halfmove_clock = 0
+        else:
+            self.halfmove_clock += 1
+
+        if not self.white_to_move:
+            self.fullmove_number += 1
+        
         # save previous state for undo
         move.prev_en_passant_square = self.en_passant_square
 
@@ -1188,3 +1337,28 @@ class GameState:
 
         return current == rebuilt
 
+
+if __name__ == "__main__":
+
+    gs = GameState()
+
+    fen = gs.to_fen()
+
+    print("FEN:")
+    print(fen)
+
+    print()
+
+    gs2 = GameState()
+
+    gs2.from_fen(fen)
+
+    print("Reconstructed:")
+    print(gs2.to_fen())
+
+    print()
+
+    print("Match:", fen == gs2.to_fen())
+
+    print("Hash OK:", gs.verify_hash())
+    print("Hash OK After Load:", gs2.verify_hash())
