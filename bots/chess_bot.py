@@ -1,16 +1,16 @@
-from bots.evaluation import evaluate_board, piece_score
-from bots.bot_profiles import (
+from evaluation import evaluate_board, piece_score
+from bot_profiles import (
     DEFAULT_BASE_WEIGHTS,
     load_weight_profile,
     make_weighted_evaluator,
 )
-from bots.policy_inference import (
+from policy_inference import (
     load_policy,
     get_legal_move_scores,
     move_to_policy_string,
     get_position_policy
 )
-from bots.search_constants import *
+from search_constants import *
 from engine.constants import (
     EXACT,
     LOWERBOUND,
@@ -20,6 +20,7 @@ from engine.constants import (
     QUPPERBOUND,
 )
 import time
+from search_stats import search_stats
 
 WHITE_BOT_PROFILE = load_weight_profile("best_white", DEFAULT_BASE_WEIGHTS)
 BLACK_BOT_PROFILE = load_weight_profile("best_black", DEFAULT_BASE_WEIGHTS)
@@ -30,15 +31,6 @@ BLACK_BOT_WEIGHTS = BLACK_BOT_PROFILE["weights"]
 WHITE_BOT_EVALUATOR = make_weighted_evaluator(WHITE_BOT_WEIGHTS)
 BLACK_BOT_EVALUATOR = make_weighted_evaluator(BLACK_BOT_WEIGHTS)
 
-
-nodes_searched = 0
-cutoffs = 0
-q_nodes = 0
-tt_hits = 0
-q_tt_hits = 0
-killer_hits = 0
-history_hits = 0
-lmr_reductions = 0
 
 transposition_table = {}
 q_transposition_table = {}
@@ -68,18 +60,11 @@ def find_best_move(
     search_depth = max_depth if max_depth is not None else MAX_DEPTH
     evaluator = evaluator or evaluate_board
 
-    global nodes_searched
-    global cutoffs
-    global q_nodes
-    global tt_hits
-    global q_tt_hits
     global killer_moves
-    global killer_hits
     global history_table
-    global history_hits
     global transposition_table
     global q_transposition_table
-    global lmr_reductions
+
 
 
     best_move = None
@@ -125,14 +110,7 @@ def find_best_move(
     for current_depth in range(1, search_depth + 1):
         iteration_start = time.perf_counter()
 
-        nodes_searched = 0
-        cutoffs = 0
-        q_nodes = 0
-        tt_hits = 0
-        q_tt_hits = 0
-        killer_hits = 0
-        history_hits = 0
-        lmr_reductions = 0
+        search_stats.reset()
         
         best_score = float('-inf')
         iteration_best_move = None
@@ -180,22 +158,22 @@ def find_best_move(
             search_moves.insert(0, best_move)
 
         elapsed_time = time.perf_counter() - iteration_start
-        pps = int(nodes_searched / elapsed_time) if elapsed_time > 0 else 0
+        pps = int(search_stats.nodes_searched / elapsed_time) if elapsed_time > 0 else 0
 
         if not quiet:
             print(f"\n-- Depth {current_depth} --")
             print("Best Move =", best_move)
             print("Best Score =", best_score)
-            print("Nodes Searched =", nodes_searched)
-            print("Cutoffs =", cutoffs)
+            print("Nodes Searched =", search_stats.nodes_searched)
+            print("Cutoffs =", search_stats.cutoffs)
             print("Time =", round(elapsed_time, 2), "seconds")
             print("Positions Per Second =", pps)
-            print("Q Nodes =", q_nodes)
-            print("TT Hits =", tt_hits)
-            print("Q TT Hits =", q_tt_hits)
-            print("Killer Hits =", killer_hits)
-            print("History Hits =", history_hits)
-            print("LMR Reductions =", lmr_reductions)
+            print("Q Nodes =", search_stats.q_nodes)
+            print("TT Hits =", search_stats.tt_hits)
+            print("Q TT Hits =", search_stats.q_tt_hits)
+            print("Killer Hits =", search_stats.killer_hits)
+            print("History Hits =", search_stats.history_hits)
+            print("LMR Reductions =", search_stats.lmr_reductions)
 
     total_time = time.perf_counter() - start_time
 
@@ -251,7 +229,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
     global history_table
     global transposition_table
 
-    nodes_searched += 1
+    search_stats.nodes_searched += 1
     _check_deadline(deadline)
     evaluator = evaluator or evaluate_board
 
@@ -272,7 +250,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
         tt_depth, tt_score, tt_flag, tt_move = transposition_table[hash_key]
 
         if tt_depth >= depth:
-            tt_hits += 1
+            search_stats.tt_hits += 1
 
             if tt_flag == EXACT:
                 return tt_score
@@ -352,7 +330,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
             if use_lmr:
 
                 global lmr_reductions
-                lmr_reductions += 1
+                search_stats.lmr_reductions += 1
                 
                 # reduced search
                 score = -negamax(
@@ -404,7 +382,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
             alpha = score
 
         if alpha >= beta:
-            cutoffs += 1
+            search_stats.cutoffs += 1
 
             if move.piece_captured == "--" and not move.is_pawn_promotion:
                 store_killer_move(ply, move)
@@ -461,16 +439,16 @@ def move_ordering(move, tt_move=None, ply=0):
 
         if killers:
             if killers[0] and move == killers[0]:
-                killer_hits += 1
+                search_stats.killer_hits += 1
                 return 900000
 
             if killers[1] and move == killers[1]:
-                killer_hits += 1
+                search_stats.killer_hits += 1
                 return 800000
 
         history_score = history_table.get(move_history_key(move), 0)
         if history_score:
-            history_hits += 1
+            search_stats.history_hits += 1
             score += min(history_score, 700000)
 
 
@@ -530,11 +508,10 @@ def _should_delta_prune(move, stand_pat, alpha):
 
 
 def quiescence(gs, alpha, beta, depth=0, evaluator=None, deadline=None):
-    global q_nodes
-    global q_tt_hits
+
     global q_transposition_table
 
-    q_nodes += 1
+    search_stats.q_nodes += 1
     _check_deadline(deadline)
     evaluator = evaluator or evaluate_board
 
@@ -549,7 +526,7 @@ def quiescence(gs, alpha, beta, depth=0, evaluator=None, deadline=None):
     if entry is not None:
         tt_depth, tt_score, tt_flag = entry
         if tt_depth >= depth:
-            q_tt_hits += 1
+            search_stats.q_tt_hits += 1
 
             if tt_flag == QEXACT:
                 return tt_score

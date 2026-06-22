@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from bots.evaluation import piece_score, piece_square_tables
+from evaluation import piece_score, piece_square_tables
+from search_utlis import *
 
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 
@@ -52,12 +53,6 @@ def load_weight_profile(name: str, fallback_weights: dict[str, float] | None = N
     payload.setdefault("history", [])
     payload.setdefault("name", name)
     return payload
-
-def side_to_move(gs) -> str:
-    return "w" if gs.white_to_move else "b"
-
-def enemy_of(color: str) -> str:
-    return "b" if color == "w" else "w"
 
 def pst_score(piece: str, row: int, col: int) -> float:
     table = piece_square_tables[piece[1:]]

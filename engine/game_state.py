@@ -13,14 +13,7 @@ class GameState:
         self.white_king_pos = WHITE_KING_START
         self.black_king_pos = BLACK_KING_START
 
-        self.move_functions = {
-            'p': self.get_pawn_moves,
-            'r': self.get_rook_moves,
-            'kn': self.get_knight_moves,
-            'b': self.get_bishop_moves,
-            'q': self.get_queen_moves,
-            'k': self.get_king_moves
-        }
+        self.move_functions = self._create_move_dispatch_table()
         
         self.white_to_move = True
         self.move_log = []
@@ -62,6 +55,17 @@ class GameState:
     # HELPERS
     # ============================================================
 
+    def _create_move_dispatch_table(self):
+
+        return {
+            "p": self.get_pawn_moves,
+            "r": self.get_rook_moves,
+            "kn": self.get_knight_moves,
+            "b": self.get_bishop_moves,
+            "q": self.get_queen_moves,
+            "k": self.get_king_moves,
+        }
+
     @staticmethod
     def is_on_board(row, col):
         return 0 <= row < BOARD_SIZE and 0 <= col < 8
@@ -79,7 +83,7 @@ class GameState:
             return self.white_king_pos
 
         return self.black_king_pos
-    
+
 
     def _castling_string(self):
 

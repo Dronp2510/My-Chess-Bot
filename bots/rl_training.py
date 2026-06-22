@@ -9,12 +9,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from bots.chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
-from bots.chess_bot import find_best_move as find_chess_bot_move
-from bots.evaluation import piece_score, piece_square_tables
-from bots.bot_profiles import load_weight_profile
 from engine.game_state import GameState
-from bots.training_constants import *
+from chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
+from chess_bot import find_best_move as find_chess_bot_move
+from evaluation import piece_score, piece_square_tables
+from bot_profiles import load_weight_profile
+from training_constants import *
+from search_utlis import *
 
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 
@@ -513,15 +514,6 @@ def print_generation_summary(summary):
         f"B {match['black_wins']}",
         f"D {match['draws']}"
     )
-
-
-def side_to_move(gs):
-    return "w" if gs.white_to_move else "b"
-
-
-def enemy_of(color):
-    return "b" if color == "w" else "w"
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
