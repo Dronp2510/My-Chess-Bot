@@ -80,7 +80,7 @@ criterion = (
     torch.nn.CrossEntropyLoss()
 )
 
-EPOCHS = 20
+from bots.training_constants import EPOCHS
 
 for epoch in range(EPOCHS):
 

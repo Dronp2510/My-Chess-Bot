@@ -5,31 +5,17 @@ import numpy as np
 import torch
 
 from bots.policy_network import PolicyNetwork
-
-PIECE_TO_PLANE = {
-    "P": 0,
-    "N": 1,
-    "B": 2,
-    "R": 3,
-    "Q": 4,
-    "K": 5,
-    "p": 6,
-    "n": 7,
-    "b": 8,
-    "r": 9,
-    "q": 10,
-    "k": 11,
-}
+from bots.ml_constants import *
 
 def gamestate_to_tensor(gs):
 
     tensor = np.zeros(
-        (12, 8, 8),
+        (NUM_PLANES, BOARD_SIZE, BOARD_SIZE),
         dtype=np.float32
     )
 
-    for r in range(8):
-        for c in range(8):
+    for r in range(BOARD_SIZE):
+        for c in range(BOARD_SIZE):
 
             piece = gs.board[r][c]
 

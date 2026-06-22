@@ -113,3 +113,15 @@ DEFAULT_CASTLING_RIGHTS = {
     "bks": True,
     "bqs": True,
 }
+
+# ============================================================
+# HASH / SEARCH
+# ============================================================
+
+EXACT = 0
+LOWERBOUND = 1
+UPPERBOUND = 2
+
+QEXACT = 0
+QLOWERBOUND = 1
+QUPPERBOUND = 2

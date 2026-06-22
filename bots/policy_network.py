@@ -1,4 +1,5 @@
 import torch.nn as nn
+from bots.ml_constants import *
 
 
 class PolicyNetwork(nn.Module):
@@ -13,7 +14,7 @@ class PolicyNetwork(nn.Module):
         self.features = nn.Sequential(
 
             nn.Conv2d(
-                12,
+                NUM_PLANES,
                 64,
                 kernel_size=3,
                 padding=1
@@ -45,7 +46,7 @@ class PolicyNetwork(nn.Module):
             nn.Flatten(),
 
             nn.Linear(
-                128 * 8 * 8,
+                128 * BOARD_SIZE * BOARD_SIZE,
                 512
             ),
 

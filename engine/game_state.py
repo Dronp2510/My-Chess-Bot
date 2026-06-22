@@ -1,26 +1,17 @@
 from engine.move import Move
 from engine.fen import board_to_fen, fen_to_board, metadata_to_string, string_to_metadata
 from engine.zobrist import compute_full_hash
-from engine.constants import (ROOK_DIRECTIONS, QUEEN_DIRECTIONS, BISHOP_DIRECTIONS, 
-                                KNIGHT_OFFSETS, KING_OFFSETS, ROOK, BISHOP, QUEEN)
+from engine.constants import *
+from copy import deepcopy
 
 class GameState:
 
     def __init__(self):
 
-        self.board = [
-                        ["br","bkn","bb","bq","bk","bb","bkn","br"],
-                        ["bp","bp","bp","bp","bp","bp","bp","bp"],
-                        ["--","--","--","--","--","--","--","--"],
-                        ["--","--","--","--","--","--","--","--"],
-                        ["--","--","--","--","--","--","--","--"],
-                        ["--","--","--","--","--","--","--","--"],
-                        ["wp","wp","wp","wp","wp","wp","wp","wp"],
-                        ["wr","wkn","wb","wq","wk","wb","wkn","wr"]
-                    ]
+        self.board = deepcopy(STARTING_BOARD)
         
-        self.white_king_pos = (7,4)
-        self.black_king_pos = (0,4)
+        self.white_king_pos = WHITE_KING_START
+        self.black_king_pos = BLACK_KING_START
 
         self.move_functions = {
             'p': self.get_pawn_moves,
@@ -73,7 +64,7 @@ class GameState:
 
     @staticmethod
     def is_on_board(row, col):
-        return 0 <= row < 8 and 0 <= col < 8
+        return 0 <= row < BOARD_SIZE and 0 <= col < 8
 
     @staticmethod
     def enemy_color(color):
@@ -204,8 +195,8 @@ class GameState:
         self.white_king_pos = None
         self.black_king_pos = None
 
-        for r in range(8):
-            for c in range(8):
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
 
                 piece = self.board[r][c]
 
@@ -590,8 +581,8 @@ class GameState:
 
         current_color = self.current_color()
 
-        for row in range(8):
-            for col in range(8):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
 
                 piece = self.board[row][col]
 
@@ -641,8 +632,8 @@ class GameState:
 
         current_color = self.current_color()
 
-        for row in range(8):
-            for col in range(8):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
 
                 piece = self.board[row][col]
 
@@ -1068,8 +1059,8 @@ class GameState:
             "k": self.get_king_capture_moves,
         }
 
-        for row in range(8):
-            for col in range(8):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
 
                 piece = self.board[row][col]
 
@@ -1215,8 +1206,8 @@ class GameState:
 
         h = 0
 
-        for row in range(8):
-            for col in range(8):
+        for row in range(BOARD_SIZE):
+            for col in range(BOARD_SIZE):
 
                 piece = self.board[row][col]
 

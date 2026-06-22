@@ -14,18 +14,8 @@ from bots.chess_bot import find_best_move as find_chess_bot_move
 from bots.evaluation import piece_score, piece_square_tables
 from bots.bot_profiles import load_weight_profile
 from engine.game_state import GameState
+from bots.training_constants import *
 
-
-GENERATIONS = 5
-GAMES_PER_PHASE = 120
-POPULATION_SIZE = 16
-MAX_PLIES = 120
-MAX_SEARCH_DEPTH = 2  # BOT_SEARCH_DEPTH
-MOVE_TIME_LIMIT = 0.3
-CHECKMATE_REWARD = 10000
-DRAW_REWARD = 0
-MUTATION_RATE = 0.25
-MUTATION_SCALE = 0.20
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 
 

@@ -10,6 +10,15 @@ from bots.policy_inference import (
     move_to_policy_string,
     get_position_policy
 )
+from bots.search_constants import *
+from engine.constants import (
+    EXACT,
+    LOWERBOUND,
+    UPPERBOUND,
+    QEXACT,
+    QLOWERBOUND,
+    QUPPERBOUND,
+)
 import time
 
 WHITE_BOT_PROFILE = load_weight_profile("best_white", DEFAULT_BASE_WEIGHTS)
@@ -21,19 +30,6 @@ BLACK_BOT_WEIGHTS = BLACK_BOT_PROFILE["weights"]
 WHITE_BOT_EVALUATOR = make_weighted_evaluator(WHITE_BOT_WEIGHTS)
 BLACK_BOT_EVALUATOR = make_weighted_evaluator(BLACK_BOT_WEIGHTS)
 
-MAX_DEPTH = 5
-MAX_Q_DEPTH = 8
-
-# Quiescence delta pruning tuning.
-# If your evaluator is still in tiny units (1, 3, 5, 9), reduce this to 1–5.
-Q_DELTA_MARGIN = 150
-
-# Null move pruning tuning.
-NULL_MOVE_REDUCTION = 2
-NULL_MOVE_MIN_DEPTH = 4
-
-# Late Move Removal
-LMR_MOVE_THRESHOLD = 4
 
 nodes_searched = 0
 cutoffs = 0
@@ -48,15 +44,6 @@ transposition_table = {}
 q_transposition_table = {}
 killer_moves = {}
 history_table = {}
-
-EXACT = 0
-LOWERBOUND = 1
-UPPERBOUND = 2
-
-QEXACT = 0
-QLOWERBOUND = 1
-QUPPERBOUND = 2
-
 
 class SearchTimeout(Exception):
     pass

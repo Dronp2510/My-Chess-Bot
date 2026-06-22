@@ -4,22 +4,7 @@ import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-
-
-PIECE_TO_PLANE = {
-    "P": 0,
-    "N": 1,
-    "B": 2,
-    "R": 3,
-    "Q": 4,
-    "K": 5,
-    "p": 6,
-    "n": 7,
-    "b": 8,
-    "r": 9,
-    "q": 10,
-    "k": 11,
-}
+from bots.ml_constants import *
 
 
 def fen_to_tensor(fen):
@@ -27,7 +12,7 @@ def fen_to_tensor(fen):
     board_part = fen.split()[0]
 
     tensor = np.zeros(
-        (12, 8, 8),
+        (NUM_PLANES, BOARD_SIZE, BOARD_SIZE),
         dtype=np.float32
     )
 
