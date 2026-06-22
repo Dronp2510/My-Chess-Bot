@@ -433,95 +433,17 @@ class GameState:
         # =========================
         # UPDATE CASTLING RIGHTS
         # =========================
-
-        if piece == "wk":
-            self.castling_rights["wks"] = False
-            self.castling_rights["wqs"] = False
-
-        elif piece == "bk":
-            self.castling_rights["bks"] = False
-            self.castling_rights["bqs"] = False
-
-        elif piece == "wr":
-
-            if sr == 7 and sc == 0:
-                self.castling_rights["wqs"] = False
-
-            elif sr == 7 and sc == 7:
-                self.castling_rights["wks"] = False
-
-        elif piece == "br":
-
-            if sr == 0 and sc == 0:
-                self.castling_rights["bqs"] = False
-
-            elif sr == 0 and sc == 7:
-                self.castling_rights["bks"] = False
         
-        # =========================
-        # ROOK CAPTURED
-        # =========================
-
-        captured = move.piece_captured
-
-        if captured == "wr":
-
-            if er == 7 and ec == 0:
-                self.castling_rights["wqs"] = False
-
-            elif er == 7 and ec == 7:
-                self.castling_rights["wks"] = False
-
-        elif captured == "br":
-
-            if er == 0 and ec == 0:
-                self.castling_rights["bqs"] = False
-
-            elif er == 0 and ec == 7:
-                self.castling_rights["bks"] = False
+        self._update_castling_rights(move)
 
         # =========================
         # HANDLE CASTLING MOVE
         # =========================
 
-        if move.is_castle_move:
-
-            # king-side
-            if ec == 6:
-                rook = self.board[er][7]
-
-                self.position_hash ^= \
-                    zobrist_piece_keys[rook][er][7]
-
-                self.board[er][5] = rook
-                self.board[er][7] = "--"
-
-                self.position_hash ^= \
-                    zobrist_piece_keys[rook][er][5]
-
-            # queen-side
-            elif ec == 2:
-                rook = self.board[er][0]
-
-                self.position_hash ^= \
-                    zobrist_piece_keys[rook][er][0]
-
-                self.board[er][3] = rook
-                self.board[er][0] = "--"
-
-                self.position_hash ^= \
-                    zobrist_piece_keys[rook][er][3]
+        self._handle_castle_rook_move(move, zobrist_piece_keys)
 
         # update en passant square
-        if piece[1:] == "p" and abs(sr - er) == 2:
-
-            self.en_passant_square = (
-                (sr + er) // 2,
-                sc
-            )
-
-        else:
-            self.en_passant_square = ()
+        self._update_en_passant_square(piece, sr, sc, er)
 
         if self.en_passant_square:
 
@@ -530,10 +452,7 @@ class GameState:
                     self.en_passant_square[1]
                 ]
             
-        if piece == 'wk':
-            self.white_king_pos = (er , ec)
-        elif piece == 'bk':
-            self.black_king_pos = (er , ec)
+        self._update_king_position(piece, er, ec)
             
         for right, enabled in self.castling_rights.items():
 
