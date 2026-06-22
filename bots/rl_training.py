@@ -18,6 +18,7 @@ from bots.training_constants import *
 
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 
+MAX_SEARCH_DEPTH = 2  # BOT_SEARCH_DEPTH
 
 BASE_WEIGHTS = {
     "p": 100.0,
