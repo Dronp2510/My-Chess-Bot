@@ -1,6 +1,8 @@
 from engine.move import Move
 from engine.fen import board_to_fen, fen_to_board, metadata_to_string, string_to_metadata
 from engine.zobrist import compute_full_hash
+from engine.constants import (ROOK_DIRECTIONS, QUEEN_DIRECTIONS, BISHOP_DIRECTIONS, 
+                                KNIGHT_OFFSETS, KING_OFFSETS, ROOK, BISHOP, QUEEN)
 
 class GameState:
 
@@ -64,6 +66,29 @@ class GameState:
         }
         self.halfmove_clock = 0
         self.fullmove_number = 1
+
+    # ============================================================
+    # HELPERS
+    # ============================================================
+
+    @staticmethod
+    def is_on_board(row, col):
+        return 0 <= row < 8 and 0 <= col < 8
+
+    @staticmethod
+    def enemy_color(color):
+        return "b" if color == "w" else "w"
+
+    def current_color(self):
+        return "w" if self.white_to_move else "b"
+
+    def current_king_position(self, color):
+
+        if color == "w":
+            return self.white_king_pos
+
+        return self.black_king_pos
+    
 
     def _castling_string(self):
 
@@ -191,6 +216,127 @@ class GameState:
                     self.black_king_pos = (r, c)
 
         self.position_hash = compute_full_hash(self)
+
+    def _update_castling_rights(self, move):
+
+        sr = move.start_row
+        sc = move.start_col
+
+        er = move.end_row
+        ec = move.end_col
+
+        piece = move.piece_moved
+
+        # =========================
+        # MOVED PIECE
+        # =========================
+
+        if piece == "wk":
+            self.castling_rights["wks"] = False
+            self.castling_rights["wqs"] = False
+
+        elif piece == "bk":
+            self.castling_rights["bks"] = False
+            self.castling_rights["bqs"] = False
+
+        elif piece == "wr":
+
+            if sr == 7 and sc == 0:
+                self.castling_rights["wqs"] = False
+
+            elif sr == 7 and sc == 7:
+                self.castling_rights["wks"] = False
+
+        elif piece == "br":
+
+            if sr == 0 and sc == 0:
+                self.castling_rights["bqs"] = False
+
+            elif sr == 0 and sc == 7:
+                self.castling_rights["bks"] = False
+
+        # =========================
+        # CAPTURED ROOK
+        # =========================
+
+        captured = move.piece_captured
+
+        if captured == "wr":
+
+            if er == 7 and ec == 0:
+                self.castling_rights["wqs"] = False
+
+            elif er == 7 and ec == 7:
+                self.castling_rights["wks"] = False
+
+        elif captured == "br":
+
+            if er == 0 and ec == 0:
+                self.castling_rights["bqs"] = False
+
+            elif er == 0 and ec == 7:
+                self.castling_rights["bks"] = False
+
+    def _handle_castle_rook_move(self,move,zobrist_piece_keys):
+
+        if not move.is_castle_move:
+            return
+
+        er = move.end_row
+        ec = move.end_col
+
+        # king side
+        if ec == 6:
+
+            rook = self.board[er][7]
+
+            self.position_hash ^= (
+                zobrist_piece_keys[rook][er][7]
+            )
+
+            self.board[er][5] = rook
+            self.board[er][7] = "--"
+
+            self.position_hash ^= (
+                zobrist_piece_keys[rook][er][5]
+            )
+
+        # queen side
+        elif ec == 2:
+
+            rook = self.board[er][0]
+
+            self.position_hash ^= (
+                zobrist_piece_keys[rook][er][0]
+            )
+
+            self.board[er][3] = rook
+            self.board[er][0] = "--"
+
+            self.position_hash ^= (
+                zobrist_piece_keys[rook][er][3]
+            )
+
+    def _update_en_passant_square( self, piece, sr, sc, er):
+
+        if piece[1:] == "p" and abs(sr - er) == 2:
+
+            self.en_passant_square = (
+                (sr + er) // 2,
+                sc
+            )
+
+        else:
+
+            self.en_passant_square = ()
+
+    def _update_king_position(self, piece, row, col):
+
+        if piece == "wk":
+            self.white_king_pos = (row, col)
+
+        elif piece == "bk":
+            self.black_king_pos = (row, col)
 
     def make_move(self, move):
         # counting calls 
@@ -523,7 +669,7 @@ class GameState:
 
         all_moves = []
 
-        current_color = 'w' if self.white_to_move else 'b'
+        current_color = self.current_color()
 
         for row in range(8):
             for col in range(8):
@@ -550,7 +696,7 @@ class GameState:
 
         color = piece[0]
 
-        enemy_color = 'b' if color == 'w' else 'w'
+        enemy_color = self.enemy_color(color)
 
         pseudo_moves = self.get_pseudo_moves(position)
 
@@ -558,16 +704,9 @@ class GameState:
 
             self.make_move(move)
 
-            if color == 'w':
-                king_pos = self.white_king_pos
-            else:
-                king_pos = self.black_king_pos
+            king_pos = self.current_king_position(color)
 
-            if not self.is_square_attacked(
-                king_pos[0],
-                king_pos[1],
-                enemy_color
-            ):
+            if not self.is_square_attacked(king_pos[0], king_pos[1], enemy_color):
                 legal_moves.append(move)
 
             self.undo_move()
@@ -575,12 +714,13 @@ class GameState:
         return legal_moves
 
     def get_all_valid_moves(self):
+
         # counting calls
         self.all_valid_move_calls += 1
 
         all_moves = []
 
-        current_color = 'w' if self.white_to_move else 'b'
+        current_color = self.current_color()
 
         for row in range(8):
             for col in range(8):
@@ -598,14 +738,15 @@ class GameState:
 
     def is_in_check(self):
 
-        current_color = 'w' if self.white_to_move else 'b'
+        current_color = self.current_color()
 
-        if current_color == 'w':
-            king_pos = self.white_king_pos
-        else:
-            king_pos = self.black_king_pos
+        king_pos = self.current_king_position(
+            current_color
+        )
 
-        enemy_color = 'b' if current_color == 'w' else 'w'
+        enemy_color = self.enemy_color(
+            current_color
+        )
 
         return self.is_square_attacked(
             king_pos[0],
@@ -633,6 +774,33 @@ class GameState:
         self.stalemate = False
 
         return "ongoing"
+
+    def _sliding_attack_exists( self, row, col, enemy_color, directions, attacking_pieces):
+
+        for dr, dc in directions:
+
+            for distance in range(1, 8):
+
+                r = row + dr * distance
+                c = col + dc * distance
+
+                if not self.is_on_board(r, c):
+                    break
+
+                piece = self.board[r][c]
+
+                if piece == "--":
+                    continue
+
+                if (
+                    piece[0] == enemy_color
+                    and piece[1:] in attacking_pieces
+                ):
+                    return True
+
+                break
+
+        return False
 
     def is_square_attacked(self, row, col, enemy_color):
         # counting calls
@@ -672,25 +840,14 @@ class GameState:
         # KNIGHT ATTACKS
         # =========================
 
-        knight_offsets = [
-            (2, 1),
-            (2, -1),
-            (-2, 1),
-            (-2, -1),
-            (1, 2),
-            (1, -2),
-            (-1, 2),
-            (-1, -2)
-        ]
-
         enemy_knight = enemy_color + "kn"
 
-        for dr, dc in knight_offsets:
+        for dr, dc in KNIGHT_OFFSETS:
 
             r = row + dr
             c = col + dc
 
-            if 0 <= r < 8 and 0 <= c < 8:
+            if self.is_on_board(r, c):
 
                 if board[r][c] == enemy_knight:
                     return True
@@ -699,25 +856,14 @@ class GameState:
         # KING ATTACKS
         # =========================
 
-        king_offsets = [
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1),
-            (0, 1),
-            (0, -1),
-            (1, 0),
-            (-1, 0)
-        ]
-
         enemy_king = enemy_color + "k"
 
-        for dr, dc in king_offsets:
+        for dr, dc in KING_OFFSETS:
 
             r = row + dr
             c = col + dc
 
-            if 0 <= r < 8 and 0 <= c < 8:
+            if self.is_on_board(r, c):
 
                 if board[r][c] == enemy_king:
                     return True
@@ -726,134 +872,92 @@ class GameState:
         # ROOK / QUEEN ATTACKS
         # =========================
 
-        rook_directions = [
-            (0, 1),
-            (0, -1),
-            (1, 0),
-            (-1, 0)
-        ]
-
-        for dr, dc in rook_directions:
-
-            for i in range(1, 8):
-
-                r = row + dr * i
-                c = col + dc * i
-
-                if not (0 <= r < 8 and 0 <= c < 8):
-                    break
-
-                piece = board[r][c]
-
-                if piece == "--":
-                    continue
-
-                if piece[0] == enemy_color:
-
-                    if piece[1:] == "r" or piece[1:] == "q":
-                        return True
-
-                break
+        if self._sliding_attack_exists(
+            row,
+            col,
+            enemy_color,
+            ROOK_DIRECTIONS,
+            {ROOK, QUEEN}
+        ):
+            return True
 
         # =========================
         # BISHOP / QUEEN ATTACKS
         # =========================
 
-        bishop_directions = [
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1)
-        ]
-
-        for dr, dc in bishop_directions:
-
-            for i in range(1, 8):
-
-                r = row + dr * i
-                c = col + dc * i
-
-                if not (0 <= r < 8 and 0 <= c < 8):
-                    break
-
-                piece = board[r][c]
-
-                if piece == "--":
-                    continue
-
-                if piece[0] == enemy_color:
-
-                    if piece[1:] == "b" or piece[1:] == "q":
-                        return True
-
-                break
+        if self._sliding_attack_exists(
+            row,
+            col,
+            enemy_color,
+            BISHOP_DIRECTIONS,
+            {BISHOP, QUEEN}
+        ):
+            return True
 
         return False
 
+    def _castle_path_is_safe(self, row, enemy_color, empty_squares, safe_squares):
+
+        for col in empty_squares:
+
+            if self.board[row][col] != "--":
+                return False
+
+        for col in safe_squares:
+
+            if self.is_square_attacked(
+                row,
+                col,
+                enemy_color
+            ):
+                return False
+
+        return True
+    
     def get_castling_moves(self, row, col, color):
 
         moves = []
 
-        enemy = 'b' if color == 'w' else 'w'
+        enemy_color = self.enemy_color(color)
 
         if self.board[row][col] != f"{color}k":
             return moves
 
         # king cannot castle while in check
-        if self.is_square_attacked(row, col, enemy):
+        if self.is_square_attacked( row, col, enemy_color):
             return moves
 
-        # WHITE
-        if color == "w":
+        home_row = 7 if color == "w" else 0
 
-            # king-side
-            if self.castling_rights["wks"]:
+        kingside_right = (
+            "wks"
+            if color == "w"
+            else "bks"
+        )
 
-                if self.board[7][5] == "--" and \
-                   self.board[7][6] == "--":
+        queenside_right = (
+            "wqs"
+            if color == "w"
+            else "bqs"
+        )
 
-                    if not self.is_square_attacked(7, 5, enemy) and \
-                       not self.is_square_attacked(7, 6, enemy):
+        # =========================
+        # KING SIDE
+        # =========================
 
-                        moves.append((7, 6))
+        if self.castling_rights[kingside_right]:
 
-            # queen-side
-            if self.castling_rights["wqs"]:
+            if self._castle_path_is_safe( home_row, enemy_color, empty_squares=(5, 6), safe_squares=(5, 6)):
+                moves.append((home_row, 6))
 
-                if self.board[7][1] == "--" and \
-                   self.board[7][2] == "--" and \
-                   self.board[7][3] == "--":
+        # =========================
+        # QUEEN SIDE
+        # =========================
 
-                    if not self.is_square_attacked(7, 2, enemy) and \
-                       not self.is_square_attacked(7, 3, enemy):
+        if self.castling_rights[queenside_right]:
 
-                        moves.append((7, 2))
-
-        # BLACK
-        else:
-
-            # king-side
-            if self.castling_rights["bks"]:
-
-                if self.board[0][5] == "--" and \
-                   self.board[0][6] == "--":
-
-                    if not self.is_square_attacked(0, 5, enemy) and \
-                       not self.is_square_attacked(0, 6, enemy):
-
-                        moves.append((0, 6))
-
-            # queen-side
-            if self.castling_rights["bqs"]:
-
-                if self.board[0][1] == "--" and \
-                   self.board[0][2] == "--" and \
-                   self.board[0][3] == "--":
-
-                    if not self.is_square_attacked(0, 2, enemy) and \
-                       not self.is_square_attacked(0, 3, enemy):
-
-                        moves.append((0, 2))
+            if self._castle_path_is_safe( home_row, enemy_color, empty_squares=(1, 2, 3), safe_squares=(2, 3)):
+                moves.append((home_row, 2))
 
         return moves
 
@@ -888,77 +992,41 @@ class GameState:
 
     def get_rook_moves(self, row, col, color):
 
-        directions = [
-            (0, 1),
-            (0, -1),
-            (1, 0),
-            (-1, 0)
-        ]
-
         return self.loop_moves(
             row,
             col,
             color,
-            directions
+            ROOK_DIRECTIONS
         )
 
     def get_bishop_moves(self, row, col, color):
 
-        directions = [
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1)
-        ]
-
         return self.loop_moves(
             row,
             col,
             color,
-            directions
+            BISHOP_DIRECTIONS
         )
 
     def get_queen_moves(self, row, col, color):
 
-        directions = [
-            (0, 1),
-            (0, -1),
-            (1, 0),
-            (-1, 0),
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1)
-        ]
-
         return self.loop_moves(
             row,
             col,
             color,
-            directions
+            QUEEN_DIRECTIONS
         )
 
-    def get_knight_moves(self, row, col, color):
+    def get_king_moves(self, row, col, color):
 
         moves = []
 
-        knight_moves = [
-            (2, 1),
-            (2, -1),
-            (-2, 1),
-            (-2, -1),
-            (1, 2),
-            (1, -2),
-            (-1, 2),
-            (-1, -2)
-        ]
-
-        for dr, dc in knight_moves:
+        for dr, dc in KING_OFFSETS:
 
             new_row = row + dr
             new_col = col + dc
 
-            if 0 <= new_row < 8 and 0 <= new_col < 8:
+            if self.is_on_board(new_row, new_col):
 
                 target = self.board[new_row][new_col]
 
@@ -967,27 +1035,16 @@ class GameState:
 
         return moves
 
-    def get_king_moves(self, row, col, color):
+    def get_knight_moves(self, row, col, color):
 
         moves = []
 
-        king_moves = [
-            (1, 1),
-            (1, -1),
-            (-1, 1),
-            (-1, -1),
-            (0, 1),
-            (0, -1),
-            (1, 0),
-            (-1, 0)
-        ]
-
-        for dr, dc in king_moves:
+        for dr, dc in KNIGHT_OFFSETS:
 
             new_row = row + dr
             new_col = col + dc
 
-            if 0 <= new_row < 8 and 0 <= new_col < 8:
+            if self.is_on_board(new_row, new_col):
 
                 target = self.board[new_row][new_col]
 
@@ -1000,66 +1057,67 @@ class GameState:
 
         moves = []
 
-        direction = -1 if color == 'w' else 1
+        direction = -1 if color == "w" else 1
+        start_row = 6 if color == "w" else 1
 
-        start_row = 6 if color == 'w' else 1
+        one_step_row = row + direction
 
-        # single move
-        if 0 <= row + direction < 8 and \
-           self.board[row + direction][col] == "--":
+        # ============================================================
+        # FORWARD MOVES
+        # ============================================================
 
-            moves.append((row + direction, col))
+        if ( self.is_on_board(one_step_row, col) and self.board[one_step_row][col] == "--"):
 
-            # double move
-            if row == start_row and \
-               self.board[row + 2 * direction][col] == "--":
+            moves.append((one_step_row, col))
 
-                moves.append((row + 2 * direction, col))
+            two_step_row = row + (2 * direction)
 
-        # capture left
-        if 0 <= col - 1 < 8 and \
-           0 <= row + direction < 8:
+            if ( row == start_row and self.board[two_step_row][col] == "--"):
+                moves.append((two_step_row, col))
 
-            target = self.board[row + direction][col - 1]
+        # ============================================================
+        # CAPTURES
+        # ============================================================
 
-            if target != "--" and target[0] != color:
+        for capture_col in (col - 1, col + 1):
 
-                moves.append((row + direction, col - 1))
+            if not self.is_on_board( one_step_row, capture_col):
+                continue
 
-        # capture right
-        if 0 <= col + 1 < 8 and \
-           0 <= row + direction < 8:
+            target = self.board[one_step_row][capture_col]
 
-            target = self.board[row + direction][col + 1]
+            # normal capture
+            if ( target != "--" and target[0] != color):
+                moves.append((
+                        one_step_row,
+                        capture_col
+                    ))
 
-            if target != "--" and target[0] != color:
-
-                moves.append((row + direction, col + 1))
-
-        # en passant
-        if self.en_passant_square:
-
-            ep_row, ep_col = self.en_passant_square
-
-            if row + direction == ep_row:
-
-                if abs(col - ep_col) == 1:
-
-                    moves.append((ep_row, ep_col))
+            # en passant
+            elif (self.en_passant_square and (one_step_row, capture_col) == self.en_passant_square):
+                moves.append((
+                        one_step_row,
+                        capture_col
+                    ))
 
         return moves
     
     def move_is_legal(self):
 
         # side that JUST moved
-        moving_color = 'b' if self.white_to_move else 'w'
+        moving_color = (
+            "b"
+            if self.white_to_move
+            else "w"
+        )
 
-        if moving_color == 'w':
-            king_pos = self.white_king_pos
-            enemy_color = 'b'
-        else:
-            king_pos = self.black_king_pos
-            enemy_color = 'w'
+        king_pos = self.current_king_position(
+            moving_color
+        )
+
+        enemy_color = self.enemy_color(
+            moving_color
+        )
 
         return not self.is_square_attacked(
             king_pos[0],
@@ -1067,42 +1125,45 @@ class GameState:
             enemy_color
         )
 
+    def _current_side_piece(self, piece):
+
+        if piece == "--":
+            return False
+
+        return (
+            (piece[0] == "w" and self.white_to_move)
+            or
+            (piece[0] == "b" and not self.white_to_move)
+        )
+    
     def get_all_capture_moves(self):
 
         moves = []
+
+        capture_generators = {
+            "p": self.get_pawn_capture_moves,
+            "r": self.get_rook_capture_moves,
+            "kn": self.get_knight_capture_moves,
+            "b": self.get_bishop_capture_moves,
+            "q": self.get_queen_capture_moves,
+            "k": self.get_king_capture_moves,
+        }
 
         for row in range(8):
             for col in range(8):
 
                 piece = self.board[row][col]
 
-                if piece == '--':
+                if not self._current_side_piece(piece):
                     continue
 
-                color = piece[0]
-
-                if (color == 'w' and self.white_to_move) or \
-                (color == 'b' and not self.white_to_move):
-
-                    piece_type = piece[1:]
-
-                    if piece_type == 'p':
-                        self.get_pawn_capture_moves(row, col, moves)
-
-                    elif piece_type == 'r':
-                        self.get_rook_capture_moves(row, col, moves)
-
-                    elif piece_type == 'kn':
-                        self.get_knight_capture_moves(row, col, moves)
-
-                    elif piece_type == 'b':
-                        self.get_bishop_capture_moves(row, col, moves)
-
-                    elif piece_type == 'q':
-                        self.get_queen_capture_moves(row, col, moves)
-
-                    elif piece_type == 'k':
-                        self.get_king_capture_moves(row, col, moves)
+                capture_generators[
+                    piece[1:]
+                ](
+                    row,
+                    col,
+                    moves
+                )
 
         return moves
     
@@ -1154,138 +1215,70 @@ class GameState:
 
     def get_knight_capture_moves(self, row, col, moves):
 
-        knight_moves = [
-            (-2,-1), (-2,1),
-            (-1,-2), (-1,2),
-            (1,-2), (1,2),
-            (2,-1), (2,1)
-        ]
-
         ally_color = self.board[row][col][0]
 
-        for dr, dc in knight_moves:
+        for dr, dc in KNIGHT_OFFSETS:
 
             end_row = row + dr
             end_col = col + dc
 
-            if 0 <= end_row < 8 and 0 <= end_col < 8:
+            if not self.is_on_board(end_row, end_col):
+                continue
+
+            end_piece = self.board[end_row][end_col]
+
+            if ( end_piece != "--" and end_piece[0] != ally_color ):
+                moves.append(Move((row, col), (end_row, end_col), self.board))
+
+    def _sliding_capture_moves(self, row, col, directions, moves):
+
+        ally_color = self.board[row][col][0]
+
+        for dr, dc in directions:
+
+            for distance in range(1, 8):
+
+                end_row = row + dr * distance
+                end_col = col + dc * distance
+
+                if not self.is_on_board(end_row,end_col):
+                    break
 
                 end_piece = self.board[end_row][end_col]
 
-                if end_piece != '--' and end_piece[0] != ally_color:
+                if end_piece == "--":
+                    continue
 
-                    moves.append(
-                        Move(
-                            (row, col),
-                            (end_row, end_col),
-                            self.board
-                        )
-                    )
+                if end_piece[0] != ally_color:
+
+                    moves.append(Move((row, col),(end_row, end_col),self.board))
+
+                break
 
     def get_rook_capture_moves(self, row, col, moves):
 
-        directions = [
-            (-1,0),
-            (1,0),
-            (0,-1),
-            (0,1)
-        ]
-
-        ally_color = self.board[row][col][0]
-
-        for dr, dc in directions:
-
-            for i in range(1, 8):
-
-                end_row = row + dr * i
-                end_col = col + dc * i
-
-                if not (0 <= end_row < 8 and 0 <= end_col < 8):
-                    break
-
-                end_piece = self.board[end_row][end_col]
-
-                if end_piece == '--':
-                    continue
-
-                if end_piece[0] != ally_color:
-
-                    moves.append(
-                        Move(
-                            (row, col),
-                            (end_row, end_col),
-                            self.board
-                        )
-                    )
-
-                break
+        self._sliding_capture_moves(row, col, ROOK_DIRECTIONS, moves)
 
     def get_bishop_capture_moves(self, row, col, moves):
 
-        directions = [
-            (-1,-1),
-            (1,1),
-            (1,-1),
-            (-1,1)
-        ]
-
-        ally_color = self.board[row][col][0]
-
-        for dr, dc in directions:
-
-            for i in range(1, 8):
-
-                end_row = row + dr * i
-                end_col = col + dc * i
-
-                if not (0 <= end_row < 8 and 0 <= end_col < 8):
-                    break
-
-                end_piece = self.board[end_row][end_col]
-
-                if end_piece == '--':
-                    continue
-
-                if end_piece[0] != ally_color:
-
-                    moves.append(
-                        Move(
-                            (row, col),
-                            (end_row, end_col),
-                            self.board
-                        )
-                    )
-
-                break
+        self._sliding_capture_moves(row, col, BISHOP_DIRECTIONS, moves)
 
     def get_king_capture_moves(self, row, col, moves):
 
-        king_moves = [
-            (-1,-1), (-1,0), (-1,1),
-            (0,-1),          (0,1),
-            (1,-1),  (1,0),  (1,1)
-        ]
-
         ally_color = self.board[row][col][0]
 
-        for dr, dc in king_moves:
+        for dr, dc in KING_OFFSETS:
 
             end_row = row + dr
             end_col = col + dc
 
-            if 0 <= end_row < 8 and 0 <= end_col < 8:
+            if not self.is_on_board(end_row,end_col):
+                continue
 
-                end_piece = self.board[end_row][end_col]
+            end_piece = self.board[end_row][end_col]
 
-                if end_piece != '--' and end_piece[0] != ally_color:
-
-                    moves.append(
-                        Move(
-                            (row, col),
-                            (end_row, end_col),
-                            self.board
-                        )
-                    )
+            if (end_piece != "--" and end_piece[0] != ally_color):
+                moves.append(Move((row, col),(end_row, end_col),self.board))
 
     def get_queen_capture_moves(self, row, col, moves):
 
