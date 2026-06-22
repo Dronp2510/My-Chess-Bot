@@ -118,7 +118,7 @@ def sync_bot_turn():
         gs,
         bot_moves,
         evaluator=bot_evaluator(state["bot_color"]),
-        quiet=True,
+        quiet=False,
         clear_transposition=True, # make False for training
     )
 

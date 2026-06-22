@@ -4,6 +4,12 @@ from bots.bot_profiles import (
     load_weight_profile,
     make_weighted_evaluator,
 )
+from bots.policy_inference import (
+    load_policy,
+    get_legal_move_scores,
+    move_to_policy_string,
+    get_position_policy
+)
 import time
 
 WHITE_BOT_PROFILE = load_weight_profile("best_white", DEFAULT_BASE_WEIGHTS)
@@ -67,6 +73,7 @@ def find_best_move(
 ):
     start_time = time.perf_counter()
     deadline = None
+    load_policy()
 
     if time_limit is not None:
         deadline = start_time + time_limit
@@ -97,6 +104,36 @@ def find_best_move(
         q_transposition_table = {}
 
     search_moves = list(valid_moves)
+
+    policy_scores = get_legal_move_scores(
+        gs,
+        search_moves
+    )
+
+    if not quiet:
+
+        ranked = sorted(
+            policy_scores.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:10]
+
+        print("\n=== POLICY TOP MOVES ===")
+
+        for move_str, score in ranked:
+            print(
+                move_str,
+                round(score, 4)
+            )
+
+    search_moves.sort(
+        key=lambda m:
+            policy_scores.get(
+                move_to_policy_string(m),
+                0.0
+            ),
+        reverse=True
+    )
 
     for current_depth in range(1, search_depth + 1):
         iteration_start = time.perf_counter()
@@ -448,6 +485,7 @@ def move_ordering(move, tt_move=None, ply=0):
         if history_score:
             history_hits += 1
             score += min(history_score, 700000)
+
 
     if move.piece_captured != "--":
         victim_value = piece_score[victim]
