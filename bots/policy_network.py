@@ -1,5 +1,5 @@
 import torch.nn as nn
-from bots.ml_constants import *
+from ml_constants import *
 
 
 class PolicyNetwork(nn.Module):

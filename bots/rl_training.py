@@ -411,8 +411,8 @@ def pst_score(piece, row, col):
     return table[7 - row][col]
 
 
-def create_population(rng):
-    population = [BASE_WEIGHTS.copy()]
+def create_population(rng, base_weights):
+    population = [base_weights.copy()]
 
     while len(population) < POPULATION_SIZE:
         population.append(mutate(BASE_WEIGHTS, rng))

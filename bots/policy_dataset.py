@@ -4,7 +4,7 @@ import numpy as np
 
 import torch
 from torch.utils.data import Dataset
-from bots.ml_constants import *
+from ml_constants import *
 
 
 def fen_to_tensor(fen):
