@@ -11,6 +11,12 @@ ASSET_CANDIDATES = [
     PROJECT_ROOT / "assets",
 ]
 
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from main import start_chess_battle
+import random
+
 def resolve_asset_path(piece_name: str) -> Path:
     for folder in ASSET_CANDIDATES:
         candidate = folder / f"{piece_name}.png"
@@ -95,13 +101,13 @@ class GameApp:
         # Game Settings
         self.sound_enabled = True
         self.piece_preference = "Any" # "White" (Easy), "Any" (Moderate), "Black" (Hard)
-        self.selected_path = None
         
         # State Machine: MAIN_MENU, OPTIONS, PATH_SELECT, MAP
         self.state = "MAIN_MENU"
 
         # Load Visuals
         self.load_orbiting_pieces()
+        self.load_difficulty_icons()
         self.init_ui()
 
     def load_orbiting_pieces(self):
@@ -128,6 +134,65 @@ class GameApp:
 
             speed = 1.0 if i % 2 == 0 else 1.5 # Varying speeds
             self.orbiters.append(OrbitingPiece(img, distance + (i % 3 * 20), speed, i * angle_step))
+    
+    def load_difficulty_icons(self):
+        self.easy_icon = None
+        self.moderate_icon = None
+        self.hard_icon = None
+
+        try:
+            self.easy_icon = pygame.transform.smoothscale(
+                pygame.image.load(
+                    str(resolve_asset_path("wk"))
+                ).convert_alpha(),
+                (80, 80)
+            )
+        except:
+            pass
+
+        try:
+            white = pygame.image.load(
+                str(resolve_asset_path("wk"))
+            ).convert_alpha()
+
+            black = pygame.image.load(
+                str(resolve_asset_path("bk"))
+            ).convert_alpha()
+
+            white = pygame.transform.smoothscale(white, (80, 80))
+            black = pygame.transform.smoothscale(black, (80, 80))
+
+            moderate = pygame.Surface(
+                (80, 80),
+                pygame.SRCALPHA
+            )
+
+            moderate.blit(
+                white,
+                (0, 0),
+                pygame.Rect(0, 0, 40, 80)
+            )
+
+            moderate.blit(
+                black,
+                (40, 0),
+                pygame.Rect(40, 0, 40, 80)
+            )
+
+            self.moderate_icon = moderate
+
+        except:
+            pass
+
+        try:
+            self.hard_icon = pygame.transform.smoothscale(
+                pygame.image.load(
+                    str(resolve_asset_path("bk"))
+                ).convert_alpha(),
+                (80, 80)
+            )
+        except:
+            pass
 
     def init_ui(self):
         btn_w, btn_h = 250, 60
@@ -136,10 +201,16 @@ class GameApp:
         gap = 80
 
         # --- Main Menu Buttons ---
-        self.btn_play = Button(left_center_x, start_y, btn_w, btn_h, "Play", self.font_button, lambda: self.change_state("PATH_SELECT"))
+        self.btn_play = Button(left_center_x, start_y, btn_w, btn_h, "Play", self.font_button, lambda: self.change_state("DIFFICULTY_SELECT"))
         self.btn_options = Button(left_center_x, start_y + gap, btn_w, btn_h, "Options", self.font_button, lambda: self.change_state("OPTIONS"))
         self.btn_quit = Button(left_center_x, start_y + gap * 2, btn_w, btn_h, "Quit", self.font_button, self.quit_game)
         self.main_buttons = [self.btn_play, self.btn_options, self.btn_quit]
+
+        # --- Difficulty ---
+        self.easy_rect = pygame.Rect(100, 180, 220, 320)
+        self.moderate_rect = pygame.Rect(400, 180, 220, 320)
+        self.hard_rect = pygame.Rect(700, 180, 220, 320)
+        self.btn_diff_back = Button(WIDTH//2 - 125,600,250,50,"Back",self.font_button,lambda: self.change_state("MAIN_MENU"))
 
         # --- Path Select Buttons ---
         center_x = WIDTH // 2 - (btn_w // 2)
@@ -151,49 +222,33 @@ class GameApp:
 
         # --- Options Buttons ---
         self.btn_toggle_sound = Button(center_x, 250, btn_w, btn_h, f"Sound: ON", self.font_button, self.toggle_sound)
-        self.btn_toggle_diff = Button(center_x, 350, btn_w, btn_h, f"Pref: {self.piece_preference}", self.font_button, self.toggle_difficulty)
         self.btn_opt_back = Button(center_x, 500, btn_w, btn_h, "Back", self.font_button, lambda: self.change_state("MAIN_MENU"))
-        self.opt_buttons = [self.btn_toggle_sound, self.btn_toggle_diff, self.btn_opt_back]
+        self.opt_buttons = [self.btn_toggle_sound, self.btn_opt_back]
 
-        # --- Map Buttons ---
-        self.btn_enter_combat = Button(WIDTH//2 - 125, HEIGHT - 100, 250, 60, "Start Battle (Demo)", self.font_button, self.launch_chess_engine)
-        self.map_buttons = [self.btn_enter_combat]
 
     def change_state(self, new_state):
         self.state = new_state
 
-    def select_path(self, path_name):
-        self.selected_path = path_name
-        self.change_state("MAP")
 
     def toggle_sound(self):
         self.sound_enabled = not self.sound_enabled
         status = "ON" if self.sound_enabled else "OFF"
         self.btn_toggle_sound.text = f"Sound: {status}"
 
-    def toggle_difficulty(self):
-        prefs = ["White", "Any", "Black"] # Easy, Moderate, Hard
-        current_idx = prefs.index(self.piece_preference)
-        self.piece_preference = prefs[(current_idx + 1) % len(prefs)]
-        self.btn_toggle_diff.text = f"Pref: {self.piece_preference}"
+    def start_difficulty(self, difficulty):
 
-    def launch_chess_engine(self):
-        print(f"Launching Chess Engine! Path: {self.selected_path}, Color Pref: {self.piece_preference}")
-        from main import start_chess_battle
 
-        if self.piece_preference == "White":
+        if difficulty == "easy":
             player_color = "w"
 
-        elif self.piece_preference == "Black":
+        elif difficulty == "hard":
             player_color = "b"
 
         else:
-            player_color = "w"
+            player_color = random.choice(["w", "b"])
 
-        start_chess_battle(
-            player_color=player_color,
-            path_modifiers=self.selected_path
-        )
+        start_chess_battle(player_color=player_color)
+    
 
     def quit_game(self):
         pygame.quit()
@@ -214,12 +269,20 @@ class GameApp:
             # Route events to the correct buttons based on state
             if self.state == "MAIN_MENU":
                 for btn in self.main_buttons: btn.handle_event(event)
-            elif self.state == "PATH_SELECT":
-                for btn in self.path_buttons: btn.handle_event(event)
             elif self.state == "OPTIONS":
                 for btn in self.opt_buttons: btn.handle_event(event)
-            elif self.state == "MAP":
-                for btn in self.map_buttons: btn.handle_event(event)
+            elif self.state == "DIFFICULTY_SELECT":
+
+                self.btn_diff_back.handle_event(event)
+
+                if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
+                    pos = event.pos
+                    if self.easy_rect.collidepoint(pos):
+                        self.start_difficulty("easy")
+                    elif self.moderate_rect.collidepoint(pos):
+                        self.start_difficulty("moderate")
+                    elif self.hard_rect.collidepoint(pos):
+                        self.start_difficulty("hard")
 
     def update(self):
         # Update animations
@@ -232,14 +295,47 @@ class GameApp:
 
         if self.state == "MAIN_MENU":
             self.draw_main_menu()
-        elif self.state == "PATH_SELECT":
-            self.draw_path_select()
         elif self.state == "OPTIONS":
             self.draw_options()
-        elif self.state == "MAP":
-            self.draw_map()
+        elif self.state == "DIFFICULTY_SELECT":
+            self.draw_difficulty_select()
 
         pygame.display.flip()
+
+    def draw_difficulty_select(self):
+        
+        mouse_pos = pygame.mouse.get_pos()
+        title = self.font_title.render("Choose Difficulty",True,GOLD)
+
+        self.window.blit(title,title.get_rect(center=(WIDTH//2, 100)))
+
+        cards = [
+            (self.easy_icon,"Easy","Always White",100),
+            (self.moderate_icon,"Moderate","Random",400),
+            (self.hard_icon,"Hard","Always Black",700)
+        ]
+
+        for icon, title_text, desc, x in cards:
+
+            rect = pygame.Rect(x, 180, 220, 320)
+
+            hovered = rect.collidepoint(mouse_pos)
+            border_color = GOLD if hovered else WHITE
+            pygame.draw.rect(self.window,DARK_GRAY,rect,border_radius=10)
+            pygame.draw.rect(self.window,border_color,rect,3,border_radius=10)
+
+            if icon:
+                self.window.blit(icon, (x + 70, 220))
+
+            title_surf = self.font_button.render(title_text,True,WHITE)
+
+            self.window.blit(title_surf,title_surf.get_rect(center=(x + 110, 330)))
+
+            desc_surf = self.font_text.render(desc,True,GRAY)
+
+            self.window.blit(desc_surf,desc_surf.get_rect(center=(x + 110, 390)))
+
+        self.btn_diff_back.draw(self.window)
 
     def draw_main_menu(self):
         # Draw Title
@@ -267,13 +363,6 @@ class GameApp:
         for orbiter in self.orbiters:
             orbiter.draw(self.window, bh_center_x, bh_center_y)
 
-    def draw_path_select(self):
-        title = self.font_title.render("Choose Your Path to Godhood", True, WHITE)
-        self.window.blit(title, title.get_rect(center=(WIDTH//2, 100)))
-        
-        for btn in self.path_buttons:
-            btn.draw(self.window)
-
     def draw_options(self):
         title = self.font_title.render("Options", True, WHITE)
         self.window.blit(title, title.get_rect(center=(WIDTH//2, 100)))
@@ -286,38 +375,6 @@ class GameApp:
         for btn in self.opt_buttons:
             btn.draw(self.window)
 
-    def draw_map(self):
-        title = self.font_title.render(f"Map: {self.selected_path}", True, PURPLE)
-        self.window.blit(title, title.get_rect(center=(WIDTH//2, 50)))
-
-        # Draw a placeholder "Slay the Spire" style map layout
-        center_x = WIDTH // 2
-        nodes = [
-            (center_x, 600), # Start
-            (center_x - 100, 450), (center_x + 100, 450), # Split
-            (center_x - 150, 300), (center_x, 300), (center_x + 150, 300), # Wide
-            (center_x, 150) # Boss
-        ]
-
-        # Draw paths between nodes
-        pygame.draw.line(self.window, GRAY, nodes[0], nodes[1], 3)
-        pygame.draw.line(self.window, GRAY, nodes[0], nodes[2], 3)
-        pygame.draw.line(self.window, GRAY, nodes[1], nodes[3], 3)
-        pygame.draw.line(self.window, GRAY, nodes[1], nodes[4], 3)
-        pygame.draw.line(self.window, GRAY, nodes[2], nodes[4], 3)
-        pygame.draw.line(self.window, GRAY, nodes[2], nodes[5], 3)
-        pygame.draw.line(self.window, GRAY, nodes[3], nodes[6], 3)
-        pygame.draw.line(self.window, GRAY, nodes[4], nodes[6], 3)
-        pygame.draw.line(self.window, GRAY, nodes[5], nodes[6], 3)
-
-        # Draw nodes
-        for i, pos in enumerate(nodes):
-            color = RED if i == len(nodes)-1 else DARK_GRAY
-            pygame.draw.circle(self.window, color, pos, 20)
-            pygame.draw.circle(self.window, WHITE, pos, 20, width=2)
-
-        for btn in self.map_buttons:
-            btn.draw(self.window)
 
 if __name__ == "__main__":
     app = GameApp()

@@ -10,12 +10,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from engine.game_state import GameState
-from chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
-from chess_bot import find_best_move as find_chess_bot_move
-from evaluation import piece_score, piece_square_tables
-from bot_profiles import load_weight_profile
-from training_constants import *
-from search_utlis import *
+from bots.chess_bot import MAX_DEPTH as BOT_SEARCH_DEPTH
+from bots.chess_bot import find_best_move as find_chess_bot_move
+from bots.evaluation import piece_score, piece_square_tables
+from bots.bot_profiles import load_weight_profile
+from bots.training_constants import *
+from bots.search_utlis import *
 
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 

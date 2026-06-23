@@ -1,16 +1,16 @@
-from evaluation import evaluate_board, piece_score
-from bot_profiles import (
+from bots.evaluation import evaluate_board, piece_score
+from bots.bot_profiles import (
     DEFAULT_BASE_WEIGHTS,
     load_weight_profile,
     make_weighted_evaluator,
 )
-from policy_inference import (
+from bots.policy_inference import (
     load_policy,
     get_legal_move_scores,
     move_to_policy_string,
     get_position_policy
 )
-from search_constants import *
+from bots.search_constants import *
 from engine.constants import (
     EXACT,
     LOWERBOUND,
@@ -20,7 +20,7 @@ from engine.constants import (
     QUPPERBOUND,
 )
 import time
-from search_stats import search_stats
+from bots.search_stats import search_stats
 
 WHITE_BOT_PROFILE = load_weight_profile("best_white", DEFAULT_BASE_WEIGHTS)
 BLACK_BOT_PROFILE = load_weight_profile("best_black", DEFAULT_BASE_WEIGHTS)

@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from evaluation import piece_score, piece_square_tables
-from search_utlis import *
+from bots.evaluation import piece_score, piece_square_tables
+from bots.search_utlis import *
 
 WEIGHTS_DIR = Path(__file__).resolve().parent / "weights"
 

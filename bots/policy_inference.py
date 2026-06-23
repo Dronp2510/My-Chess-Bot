@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from policy_network import PolicyNetwork
-from ml_constants import *
+from bots.policy_network import PolicyNetwork
+from bots.ml_constants import *
 
 def gamestate_to_tensor(gs):
 

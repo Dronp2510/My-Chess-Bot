@@ -4,12 +4,12 @@ import torch
 
 from torch.utils.data import DataLoader
 
-from policy_dataset import (
+from bots.policy_dataset import (
     MoveVocabulary,
     ChessDataset,
 )
 
-from policy_network import (
+from bots.policy_network import (
     PolicyNetwork
 )
 

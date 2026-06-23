@@ -136,7 +136,7 @@ def reset_for_player(player_color: str):
     sync_bot_turn()
 
 
-def start_chess_battle(player_color="w", path_modifiers=None):
+def start_chess_battle(player_color="w"):
     global state, gs
 
     state = create_game(player_color)
