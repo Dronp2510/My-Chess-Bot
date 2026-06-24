@@ -51,6 +51,10 @@ class GameState:
         self.halfmove_clock = 0
         self.fullmove_number = 1
 
+        # Main Game Classes
+
+        self.battle_state = None
+
     # ============================================================
     # HELPERS
     # ============================================================
@@ -83,7 +87,6 @@ class GameState:
             return self.white_king_pos
 
         return self.black_king_pos
-
 
     def _castling_string(self):
 
@@ -332,6 +335,21 @@ class GameState:
 
         elif piece == "bk":
             self.black_king_pos = (row, col)
+
+    # ============================================================
+    # HELPERS BATTLE STATE
+    # ============================================================
+    
+    def is_fortunate_square(self, row, col):
+
+        if self.battle_state is None:
+            return False
+
+        return self.battle_state.has_status(
+            (row, col),
+            "Fortunate"
+        )
+
 
     def make_move(self, move):
         # counting calls 
@@ -615,6 +633,13 @@ class GameState:
         pseudo_moves = self.get_pseudo_moves(position)
 
         for move in pseudo_moves:
+            
+            # ----------------------------------
+            # FORTUNATE PIECE FILTER
+            # ----------------------------------
+            if move.piece_captured != "--":
+                if self.is_fortunate_square(move.end_row,move.end_col):
+                    continue
 
             self.make_move(move)
 
