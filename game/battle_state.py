@@ -57,3 +57,12 @@ class BattleState:
             return
 
         self.statuses[end_square] = self.statuses.pop(start_square)
+
+    def get_status(self, square, status_name):
+
+        for status in self.get_statuses(square):
+
+            if status.name == status_name:
+                return status
+
+        return None

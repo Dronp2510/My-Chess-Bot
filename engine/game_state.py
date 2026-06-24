@@ -633,7 +633,7 @@ class GameState:
         pseudo_moves = self.get_pseudo_moves(position)
 
         for move in pseudo_moves:
-            
+
             # ----------------------------------
             # FORTUNATE PIECE FILTER
             # ----------------------------------
@@ -649,6 +649,16 @@ class GameState:
                 legal_moves.append(move)
 
             self.undo_move()
+            
+        if self.battle_state is not None:
+
+            misfortunate = (self.battle_state.get_status(position,"Misfortunate"))
+
+            if misfortunate is not None:
+
+                from game.status_processors import (apply_misfortunate_filter)
+
+                legal_moves = (apply_misfortunate_filter(legal_moves,misfortunate))
 
         return legal_moves
 
