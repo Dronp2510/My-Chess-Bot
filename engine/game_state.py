@@ -362,6 +362,9 @@ class GameState:
             en_passant_keys
         )
 
+        if self.battle_state is not None:
+            move.prev_status_snapshot = (self.battle_state.snapshot_statuses())
+        
         sr = move.start_row
         sc = move.start_col
 
@@ -412,6 +415,8 @@ class GameState:
 
         move.prev_castling_rights = self.castling_rights.copy()
 
+        if self.battle_state is not None:
+            self.battle_state.move_piece_status((move.start_row, move.start_col),(move.end_row, move.end_col))
 
         if move.is_en_passant_move:
             captured_row = sr
@@ -529,6 +534,9 @@ class GameState:
         # restore king positions
         self.white_king_pos = move.prev_white_king_pos
         self.black_king_pos = move.prev_black_king_pos
+
+        if (self.battle_state is not None and move.prev_status_snapshot is not None):
+            self.battle_state.restore_statuses(move.prev_status_snapshot)
 
         # switch turns back
         self.white_to_move = not self.white_to_move

@@ -107,6 +107,8 @@ class Move:
         self.prev_white_king_pos = None
         self.prev_black_king_pos = None
 
+        self.prev_status_snapshot = None
+
     # ============================================================
     # SPECIAL MOVE DETECTION
     # ============================================================

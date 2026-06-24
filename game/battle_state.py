@@ -1,3 +1,4 @@
+import copy
 from collections import defaultdict
 
 from game.conceptualization import CZPool
@@ -66,3 +67,10 @@ class BattleState:
                 return status
 
         return None
+    
+    def snapshot_statuses(self):
+        return copy.deepcopy(self.statuses)
+    
+    def restore_statuses(self, snapshot):
+        self.statuses.clear()
+        self.statuses.update(snapshot)
