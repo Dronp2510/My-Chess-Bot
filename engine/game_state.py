@@ -478,6 +478,12 @@ class GameState:
                 self.position_hash ^= castling_keys[right]
         
         self.position_hash ^= side_to_move_key
+
+        moved_side = "w" if self.white_to_move else "b"
+        opponent_side = ("b" if moved_side == "w" else "w")
+        if self.battle_state is not None:
+            self.battle_state.tick_statuses_for_color(opponent_side)
+
         self.white_to_move = not self.white_to_move
 
     def undo_move(self):    

@@ -31,14 +31,16 @@ class BattleState:
 
         return False
 
-    def tick_statuses(self):
+    def tick_statuses_for_color(self, color):
 
-        expired = []
+        expired_squares = []
 
-        for piece, effects in self.statuses.items():
+        for square, effects in self.statuses.items():
 
             for effect in effects:
-                effect.tick()
+
+                if effect.owner_color == color:
+                    effect.tick()
 
             effects[:] = [
                 effect
@@ -47,11 +49,11 @@ class BattleState:
             ]
 
             if not effects:
-                expired.append(piece)
+                expired_squares.append(square)
 
-        for piece in expired:
-            del self.statuses[piece]
-    
+        for square in expired_squares:
+            del self.statuses[square]
+                 
     def move_piece_status(self, start_square, end_square):
 
         if start_square not in self.statuses:
