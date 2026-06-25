@@ -1,8 +1,8 @@
 import pygame
 
-def highlight_moves(surface, valid_moves, is_white=True):
+def highlight_moves(surface, valid_moves, board_rect, is_white=True):
     WIDTH, HEIGHT = surface.get_size()
-    square_size = min(WIDTH, HEIGHT) // 8
+    square_size = board_rect.width // 8
 
     for move in valid_moves:
 
@@ -19,5 +19,5 @@ def highlight_moves(surface, valid_moves, is_white=True):
 
         surface.blit(
             highlight,
-            (col * square_size, row * square_size)
+            (board_rect.x + col * square_size, board_rect.y + row * square_size)
         )

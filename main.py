@@ -20,6 +20,26 @@ ASSET_CANDIDATES = [
     PROJECT_ROOT / "assets",
 ]
 
+# =========================
+# Battle UI Layout
+# =========================
+
+WINDOW_WIDTH = 1400
+WINDOW_HEIGHT = 900
+
+BOARD_SIZE = 760
+
+BOARD_RECT = pygame.Rect(20,20,BOARD_SIZE,BOARD_SIZE)
+
+SIDE_PANEL_X = BOARD_RECT.right + 20
+SIDE_PANEL_WIDTH = 520
+
+STATUS_RECT = pygame.Rect(SIDE_PANEL_X,20,SIDE_PANEL_WIDTH,180)
+CORRUPTION_RECT = pygame.Rect(SIDE_PANEL_X,220,SIDE_PANEL_WIDTH,180)
+INVENTORY_RECT = pygame.Rect(SIDE_PANEL_X,420,SIDE_PANEL_WIDTH,400)
+ABILITY_BAR_RECT = pygame.Rect(20,840,1360,60)
+
+
 def resolve_asset_path(piece_name: str) -> Path:
     for folder in ASSET_CANDIDATES:
         candidate = folder / f"{piece_name}.png"
@@ -47,22 +67,22 @@ def load_images(square_size):
 
     return images
 
-def chess_board(surface):
-    width, height = surface.get_size()
-    square_size = min(width, height) // 8
+def chess_board(surface, board_rect):
+
+    square_size = board_rect.width // 8
 
     colors = [pygame.Color("white"), pygame.Color("brown")]
     for row in range(8):
         for column in range(8):
             color = colors[(row + column) % 2]
-            rect = pygame.Rect(column * square_size, row * square_size, square_size, square_size)
+            rect = pygame.Rect(board_rect.x + column * square_size,board_rect.y + row * square_size,square_size,square_size)
             pygame.draw.rect(surface, color, rect)
 
     return square_size
 
-def draw_pieces(surface, board, images, is_white=True):
-    width, height = surface.get_size()
-    square_size = min(width, height) // 8
+def draw_pieces(surface, board, images, board_rect, is_white=True):
+
+    square_size = board_rect.width // 8
 
     for row in range(8):
         for col in range(8):
@@ -70,7 +90,7 @@ def draw_pieces(surface, board, images, is_white=True):
             display_col = col if is_white else 7 - col
             piece = board[row][col]
             if piece != "--":
-                surface.blit(images[piece], (display_col * square_size, display_row * square_size))
+                surface.blit(images[piece],(board_rect.x + display_col * square_size,board_rect.y + display_row * square_size))
 
 def current_turn_color(gs):
     return "w" if gs.white_to_move else "b"
@@ -80,6 +100,19 @@ def bot_weight_profile(bot_color):
 
 def bot_evaluator(bot_color):
     return make_weighted_evaluator(bot_weight_profile(bot_color))
+
+def draw_battle_panels(surface):
+
+    font = pygame.font.SysFont("arial", 24)
+
+    panels = [(STATUS_RECT, "Status Effects"),(CORRUPTION_RECT, "Corruption"),(INVENTORY_RECT, "Inventory"),(ABILITY_BAR_RECT, "Abilities")]
+
+    for rect, title in panels:
+        pygame.draw.rect(surface, (35, 35, 40), rect)
+        pygame.draw.rect(surface, (180, 180, 180), rect, 2)
+        text = font.render(title, True, (255, 255, 255))
+        surface.blit(text,(rect.x + 10, rect.y + 10))
+
 
 def create_game(player_color="w"):
     gs = GameState()
@@ -93,10 +126,10 @@ def create_game(player_color="w"):
 
 state = create_game("w")
 gs = state["gs"]
-window = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT),pygame.RESIZABLE)
 clock = pygame.time.Clock()
 pygame.display.set_caption("My Chess")
-images = load_images(min(window.get_size()) // 8)
+images = load_images(BOARD_RECT.width // 8)
 run = True
 
 def sync_bot_turn():
@@ -142,9 +175,9 @@ def start_chess_battle(player_color="w"):
     state = create_game(player_color)
     gs = state["gs"]
 
-    window = pygame.display.set_mode((500, 500), pygame.RESIZABLE)
+    window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT),pygame.RESIZABLE)
     clock = pygame.time.Clock()
-    images = load_images(min(window.get_size()) // 8)
+    images = load_images(BOARD_RECT.width // 8)
 
     sync_bot_turn()
 
@@ -175,11 +208,16 @@ def start_chess_battle(player_color="w"):
 
                 mouse_pos = pygame.mouse.get_pos()
 
-                width, height = window.get_size()
-                square_size = min(width, height) // 8
+                square_size = BOARD_RECT.width // 8
 
-                raw_col = mouse_pos[0] // square_size
-                raw_row = mouse_pos[1] // square_size
+                if not BOARD_RECT.collidepoint(mouse_pos):
+                    continue
+
+                local_x = mouse_pos[0] - BOARD_RECT.x
+                local_y = mouse_pos[1] - BOARD_RECT.y
+
+                raw_col = local_x // square_size
+                raw_row = local_y // square_size
 
                 if not (0 <= raw_row < 8 and 0 <= raw_col < 8):
                     continue
@@ -236,7 +274,9 @@ def start_chess_battle(player_color="w"):
         if gs.get_game_state() == "ongoing":
             sync_bot_turn()
 
-        chess_board(window)
+        window.fill((20, 20, 25))
+        draw_battle_panels(window)
+        chess_board(window,BOARD_RECT)
 
         is_white_view = (
             state["player_color"] == "w"
@@ -245,6 +285,7 @@ def start_chess_battle(player_color="w"):
         highlight_moves(
             window,
             state["valid_moves"],
+            BOARD_RECT,
             is_white=is_white_view
         )
 
@@ -252,6 +293,7 @@ def start_chess_battle(player_color="w"):
             window,
             gs.board,
             images,
+            BOARD_RECT,
             is_white=is_white_view
         )
 
