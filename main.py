@@ -20,6 +20,10 @@ ASSET_CANDIDATES = [
     PROJECT_ROOT / "assets",
 ]
 
+TEMP_ABILITIES = [
+    "Lucky One"
+]
+
 # =========================
 # Battle UI Layout
 # =========================
@@ -37,7 +41,47 @@ SIDE_PANEL_WIDTH = 520
 STATUS_RECT = pygame.Rect(SIDE_PANEL_X,20,SIDE_PANEL_WIDTH,180)
 CORRUPTION_RECT = pygame.Rect(SIDE_PANEL_X,220,SIDE_PANEL_WIDTH,180)
 INVENTORY_RECT = pygame.Rect(SIDE_PANEL_X,420,SIDE_PANEL_WIDTH,400)
-ABILITY_BAR_RECT = pygame.Rect(20,840,1360,60)
+ABILITY_BAR_RECT = pygame.Rect(20,780,1360,60)
+
+def draw_ability_panel(surface):
+
+    font = pygame.font.SysFont("arial", 22)
+
+    pygame.draw.rect(surface,(35,35,40),ABILITY_BAR_RECT)
+
+    pygame.draw.rect(surface,(180,180,180),ABILITY_BAR_RECT,2)
+
+    title = font.render("Abilities",True,(255,255,255))
+
+    surface.blit(title,(ABILITY_BAR_RECT.x + 10,ABILITY_BAR_RECT.y + 5))
+
+    state["ability_buttons"] = []
+
+    button_width = 160
+    button_height = 45
+
+    start_x = ABILITY_BAR_RECT.x + 120
+    start_y = ABILITY_BAR_RECT.y + 18
+
+    for i, ability in enumerate(TEMP_ABILITIES):
+
+        rect = pygame.Rect(start_x + i * 150,start_y,button_width,button_height)
+
+        color = ((120,80,20) if state["selected_ability"] == ability else (60,60,70))
+
+        pygame.draw.rect(surface,color,rect,border_radius=5)
+
+        pygame.draw.rect(surface,(200,200,200),rect,2,border_radius=5)
+
+        text = font.render(ability,True,(255,255,255))
+
+        surface.blit(text,text.get_rect(center=rect.center))
+
+        state["ability_buttons"].append({"ability": ability,"rect": rect})
+        
+    cz_text = font.render("CZ: 5 / 5",True,(255,215,0))
+
+    surface.blit(cz_text,(ABILITY_BAR_RECT.right - 120,ABILITY_BAR_RECT.y + 15))
 
 
 def resolve_asset_path(piece_name: str) -> Path:
@@ -105,7 +149,7 @@ def draw_battle_panels(surface):
 
     font = pygame.font.SysFont("arial", 24)
 
-    panels = [(STATUS_RECT, "Status Effects"),(CORRUPTION_RECT, "Corruption"),(INVENTORY_RECT, "Inventory"),(ABILITY_BAR_RECT, "Abilities")]
+    panels = [(STATUS_RECT, "Status Effects"),(CORRUPTION_RECT, "Corruption"),(INVENTORY_RECT, "Inventory")]
 
     for rect, title in panels:
         pygame.draw.rect(surface, (35, 35, 40), rect)
@@ -122,6 +166,8 @@ def create_game(player_color="w"):
         "bot_color": opponent(player_color),
         "selected_square": None,
         "valid_moves": [],
+        "selected_ability": None,
+        "ability_buttons": [],
     }
 
 state = create_game("w")
@@ -208,6 +254,18 @@ def start_chess_battle(player_color="w"):
 
                 mouse_pos = pygame.mouse.get_pos()
 
+                ability_clicked = False
+
+                for button in state["ability_buttons"]:
+
+                    if button["rect"].collidepoint(mouse_pos):
+                        state["selected_ability"] = (button["ability"])
+                        ability_clicked = True
+                        break
+
+                if ability_clicked:
+                    continue
+
                 square_size = BOARD_RECT.width // 8
 
                 if not BOARD_RECT.collidepoint(mouse_pos):
@@ -276,6 +334,7 @@ def start_chess_battle(player_color="w"):
 
         window.fill((20, 20, 25))
         draw_battle_panels(window)
+        draw_ability_panel(window)
         chess_board(window,BOARD_RECT)
 
         is_white_view = (

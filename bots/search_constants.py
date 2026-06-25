@@ -1,4 +1,4 @@
-MAX_DEPTH = 5
+MAX_DEPTH = 2
 MAX_Q_DEPTH = 8
 
 # Quiescence
