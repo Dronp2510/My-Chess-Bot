@@ -387,11 +387,17 @@ def start_chess_battle(player_color="w"):
                     )
 
                     if move in state["valid_moves"]:
-                        gs.make_move(move)
-                        state["selected_square"] = None
-                        state["valid_moves"] = []
 
-                    else:
+                        state["battle_state"].move_piece_status((move.start_row, move.start_col),(move.end_row, move.end_col))
+
+                        if move.is_castle_move:
+                            if move.end_col == 6:
+                                state["battle_state"].move_piece_status((move.start_row, 7),(move.start_row, 5))
+
+                            else:
+                                state["battle_state"].move_piece_status((move.start_row, 0),(move.start_row, 3))
+
+                        gs.make_move(move)
                         state["selected_square"] = None
                         state["valid_moves"] = []
 
