@@ -11,6 +11,11 @@ from bots.chess_bot import (
     clear_search_cache,
 )
 from bots.bot_profiles import make_weighted_evaluator
+from game.battle_state import BattleState
+from game.paths.fortune_path import FortunePath
+from game.paths.fortune_abilities import (
+    LuckyOne,
+)
 
 pygame.init()
 
@@ -23,6 +28,10 @@ ASSET_CANDIDATES = [
 TEMP_ABILITIES = [
     "Lucky One"
 ]
+
+ABILITY_OBJECTS = {
+    "Lucky One": LuckyOne(),
+}
 
 # =========================
 # Battle UI Layout
@@ -79,8 +88,18 @@ def draw_ability_panel(surface):
 
         state["ability_buttons"].append({"ability": ability,"rect": rect})
         
-    cz_text = font.render("CZ: 5 / 5",True,(255,215,0))
+    battle_state = state["battle_state"]
 
+    cz_text = font.render(
+        f"CZ: {battle_state.cz.current_cz} / {battle_state.cz.max_cz}",
+        True,
+        (255,215,0)
+    )
+
+    if state["ability_targeting"]:
+        target_text = font.render(f"TARGETING: {state['selected_ability']}",True,(255,220,0))
+        surface.blit(target_text,(ABILITY_BAR_RECT.x + 400,ABILITY_BAR_RECT.y + 15))
+    
     surface.blit(cz_text,(ABILITY_BAR_RECT.right - 120,ABILITY_BAR_RECT.y + 15))
 
 
@@ -135,6 +154,18 @@ def draw_pieces(surface, board, images, board_rect, is_white=True):
             piece = board[row][col]
             if piece != "--":
                 surface.blit(images[piece],(board_rect.x + display_col * square_size,board_rect.y + display_row * square_size))
+    
+    battle_state = state["battle_state"]
+    for square, effects in battle_state.statuses.items():
+        row, col = square
+        display_row = row if is_white else 7 - row
+        display_col = col if is_white else 7 - col
+
+        center = (board_rect.x + display_col * square_size + square_size // 2,board_rect.y + display_row * square_size + square_size // 2)
+
+        for effect in effects:
+            if effect.name == "Fortunate":
+                pygame.draw.circle(surface,(255,215,0),center,square_size // 4,4)
 
 def current_turn_color(gs):
     return "w" if gs.white_to_move else "b"
@@ -157,17 +188,29 @@ def draw_battle_panels(surface):
         text = font.render(title, True, (255, 255, 255))
         surface.blit(text,(rect.x + 10, rect.y + 10))
 
+    battle_state = state["battle_state"]
+    y = STATUS_RECT.y + 50
+
+    for square, effects in battle_state.statuses.items():
+        names = ", ".join(effect.name for effect in effects)
+        text = font.render(f"{square}: {names}",True,(220,220,220))
+        surface.blit(text,(STATUS_RECT.x + 10, y))
+        y += 25
+
 
 def create_game(player_color="w"):
     gs = GameState()
+    battle_state = BattleState(FortunePath(stage=5))
     return {
         "gs": gs,
+        "battle_state": battle_state,
         "player_color": player_color,
         "bot_color": opponent(player_color),
         "selected_square": None,
         "valid_moves": [],
         "selected_ability": None,
         "ability_buttons": [],
+        "ability_targeting": False,
     }
 
 state = create_game("w")
@@ -259,7 +302,11 @@ def start_chess_battle(player_color="w"):
                 for button in state["ability_buttons"]:
 
                     if button["rect"].collidepoint(mouse_pos):
-                        state["selected_ability"] = (button["ability"])
+                        state["selected_ability"] = button["ability"]
+                        state["ability_targeting"] = True
+
+                        state["selected_square"] = None
+                        state["valid_moves"] = []
                         ability_clicked = True
                         break
 
@@ -286,6 +333,25 @@ def start_chess_battle(player_color="w"):
                 else:
                     col = 7 - raw_col
                     row = 7 - raw_row
+
+                if state["ability_targeting"]:
+
+                    piece = gs.board[row][col]
+
+                    if (piece != "--"and piece[0] == state["player_color"]):
+
+                        ability = ABILITY_OBJECTS[state["selected_ability"]]
+
+                        success = ability.activate(state["battle_state"],targets=[(row, col)],owner_color=state["player_color"])
+
+                        if success:
+                            state["ability_targeting"] = False
+                            state["selected_ability"] = None
+
+                        state["selected_square"] = None
+                        state["valid_moves"] = []
+
+                    continue
 
                 if state["selected_square"] is None:
 

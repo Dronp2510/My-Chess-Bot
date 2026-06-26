@@ -18,7 +18,8 @@ class LuckyOne(Ability):
     def activate(
         self,
         battle_state,
-        targets
+        targets,
+        owner_color
     ):
 
         if not battle_state.cz.spend(self.cost):
@@ -35,6 +36,7 @@ class LuckyOne(Ability):
             battle_state.add_status(
                 square,
                 FortunateStatus(
+                    owner_color=owner_color,
                     duration=path.get_fortunate_duration()
                 )
             )
@@ -52,7 +54,8 @@ class UnluckyOne(Ability):
     def activate(
         self,
         battle_state,
-        targets
+        targets,
+        owner_color
     ):
 
         if not battle_state.cz.spend(self.cost):
@@ -74,10 +77,9 @@ class UnluckyOne(Ability):
             battle_state.add_status(
                 square,
                 MisfortunateStatus(
-                    reduction_percent=
-                        path.get_move_reduction(),
-                    duration=
-                        path.get_misfortunate_duration(),
+                    owner_color=owner_color,
+                    reduction_percent=path.get_move_reduction(),
+                    duration=path.get_misfortunate_duration(),
                     seed=seed
                 )
             )
@@ -96,7 +98,8 @@ class ArmyOfLuck(Ability):
     def activate(
         self,
         battle_state,
-        friendly_squares
+        friendly_squares,
+        owner_color
     ):
 
         if not battle_state.cz.spend(self.cost):
@@ -122,8 +125,8 @@ class ArmyOfLuck(Ability):
             battle_state.add_status(
                 square,
                 FortunateStatus(
-                    duration=
-                        path.get_fortunate_duration()
+                    owner_color=owner_color,
+                    duration=path.get_fortunate_duration()
                 )
             )
 
@@ -141,7 +144,8 @@ class ArmyOfUnluck(Ability):
     def activate(
         self,
         battle_state,
-        enemy_squares
+        enemy_squares,
+        owner_color
     ):
 
         if not battle_state.cz.spend(self.cost):
@@ -172,10 +176,9 @@ class ArmyOfUnluck(Ability):
             battle_state.add_status(
                 square,
                 MisfortunateStatus(
-                    reduction_percent=
-                        path.get_move_reduction(),
-                    duration=
-                        path.get_misfortunate_duration(),
+                    owner_color=owner_color,
+                    reduction_percent=path.get_move_reduction(),
+                    duration=path.get_misfortunate_duration(),
                     seed=seed
                 )
             )
