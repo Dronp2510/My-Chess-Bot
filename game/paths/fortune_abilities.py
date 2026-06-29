@@ -15,12 +15,7 @@ class LuckyOne(Ability):
             cost=2
         )
 
-    def activate(
-        self,
-        battle_state,
-        targets,
-        owner_color
-    ):
+    def activate(self,battle_state,targets,owner_color):
 
         if not battle_state.cz.spend(self.cost):
             return False
@@ -35,13 +30,21 @@ class LuckyOne(Ability):
 
             battle_state.add_status(
                 square,
-                FortunateStatus(
-                    owner_color=owner_color,
-                    duration=path.get_fortunate_duration()
-                )
+                FortunateStatus(owner_color=owner_color,duration=path.get_fortunate_duration())
             )
 
         return True
+    
+    def validate_target(self,gs,battle_state,square,owner_color):
+
+        row, col = square
+
+        piece = gs.board[row][col]
+
+        if piece == "--":
+            return False
+
+        return piece[0] == owner_color
 
 class UnluckyOne(Ability):
 
@@ -51,12 +54,7 @@ class UnluckyOne(Ability):
             cost=4
         )
 
-    def activate(
-        self,
-        battle_state,
-        targets,
-        owner_color
-    ):
+    def activate(self,battle_state,targets,owner_color):
 
         if not battle_state.cz.spend(self.cost):
             return False
@@ -69,10 +67,7 @@ class UnluckyOne(Ability):
 
         for square in targets:
 
-            seed = random.randint(
-                0,
-                2**31 - 1
-            )
+            seed = random.randint(0, 2**31 - 1)
 
             battle_state.add_status(
                 square,
@@ -85,6 +80,17 @@ class UnluckyOne(Ability):
             )
 
         return True
+
+    def validate_target(self,gs,battle_state,square,owner_color):
+
+        row, col = square
+
+        piece = gs.board[row][col]
+
+        if piece == "--":
+            return False
+
+        return piece[0] != owner_color
 
 class ArmyOfLuck(Ability):
 

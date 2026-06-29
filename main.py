@@ -14,7 +14,7 @@ from bots.bot_profiles import make_weighted_evaluator
 from game.battle_state import BattleState
 from game.paths.fortune_path import FortunePath
 from game.paths.fortune_abilities import (
-    LuckyOne,
+    LuckyOne, UnluckyOne
 )
 
 pygame.init()
@@ -26,11 +26,13 @@ ASSET_CANDIDATES = [
 ]
 
 TEMP_ABILITIES = [
-    "Lucky One"
+    "Lucky One",
+    "Unlucky One",
 ]
 
 ABILITY_OBJECTS = {
     "Lucky One": LuckyOne(),
+    "Unlucky One": UnluckyOne(),
 }
 
 # =========================
@@ -336,20 +338,19 @@ def start_chess_battle(player_color="w"):
 
                 if state["ability_targeting"]:
 
-                    piece = gs.board[row][col]
+                    ability = ABILITY_OBJECTS[state["selected_ability"]]
 
-                    if (piece != "--"and piece[0] == state["player_color"]):
+                    if not ability.validate_target(gs,state["battle_state"],(row, col),state["player_color"]):
+                        continue
 
-                        ability = ABILITY_OBJECTS[state["selected_ability"]]
+                    success = ability.activate(state["battle_state"],targets=[(row, col)],owner_color=state["player_color"])
 
-                        success = ability.activate(state["battle_state"],targets=[(row, col)],owner_color=state["player_color"])
+                    if success:
+                        state["ability_targeting"] = False
+                        state["selected_ability"] = None
 
-                        if success:
-                            state["ability_targeting"] = False
-                            state["selected_ability"] = None
-
-                        state["selected_square"] = None
-                        state["valid_moves"] = []
+                    state["selected_square"] = None
+                    state["valid_moves"] = []
 
                     continue
 
