@@ -35,9 +35,17 @@ ABILITY_OBJECTS = {
     "Unlucky One": UnluckyOne(),
 }
 
+STATE = {
+    "hover_square": None,
+    "hover_moves": [],
+}
+
 # =========================
 # Battle UI Layout
 # =========================
+
+FORTUNATE_COLOR = (255,215,0)
+MISFORTUNATE_COLOR = (160,0,200)
 
 WINDOW_WIDTH = 1400
 WINDOW_HEIGHT = 900
@@ -148,7 +156,7 @@ def chess_board(surface, board_rect):
 def draw_pieces(surface, board, images, board_rect, is_white=True):
 
     square_size = board_rect.width // 8
-
+    radius = square_size // 4
     for row in range(8):
         for col in range(8):
             display_row = row if is_white else 7 - row
@@ -167,7 +175,28 @@ def draw_pieces(surface, board, images, board_rect, is_white=True):
 
         for effect in effects:
             if effect.name == "Fortunate":
-                pygame.draw.circle(surface,(255,215,0),center,square_size // 4,4)
+                pygame.draw.circle(surface, FORTUNATE_COLOR, center, radius, 4)
+            elif effect.name == "Misfortunate":
+                pygame.draw.circle(surface, MISFORTUNATE_COLOR, center, radius, 4)
+                pygame.draw.circle(surface, (60,0,70), center, radius-2, 2)
+
+def draw_hover_moves(surface,board_rect,is_white=True):
+
+    if not state["hover_moves"]:
+        return
+
+    square_size = board_rect.width // 8
+
+    overlay = pygame.Surface((square_size, square_size),pygame.SRCALPHA)
+
+    overlay.fill((160, 0, 200, 90))
+
+    for row, col in state["hover_moves"]:
+
+        display_row = row if is_white else 7 - row
+        display_col = col if is_white else 7 - col
+
+        surface.blit(overlay,(board_rect.x + display_col * square_size,board_rect.y + display_row * square_size,))
 
 def current_turn_color(gs):
     return "w" if gs.white_to_move else "b"
@@ -199,6 +228,16 @@ def draw_battle_panels(surface):
         surface.blit(text,(STATUS_RECT.x + 10, y))
         y += 25
 
+def get_remaining_moves_for_square(gs, row, col):
+
+    remaining = []
+
+    legal_moves = gs.get_valid_moves((row, col))
+
+    for move in legal_moves:
+        remaining.append((move.end_row, move.end_col))
+
+    return remaining
 
 def create_game(player_color="w"):
     gs = GameState()
@@ -405,29 +444,43 @@ def start_chess_battle(player_color="w"):
         if gs.get_game_state() == "ongoing":
             sync_bot_turn()
 
+        mouse_pos = pygame.mouse.get_pos()
+        state["hover_square"] = None
+        state["hover_moves"] = []
+
+        if BOARD_RECT.collidepoint(mouse_pos):
+
+            square_size = BOARD_RECT.width // 8
+
+            local_x = mouse_pos[0] - BOARD_RECT.x
+            local_y = mouse_pos[1] - BOARD_RECT.y
+
+            raw_col = local_x // square_size
+            raw_row = local_y // square_size
+
+            if state["player_color"] == "w":
+                row = raw_row
+                col = raw_col
+            else:
+                row = 7 - raw_row
+                col = 7 - raw_col
+
+            if state["battle_state"].has_status((row, col),"Misfortunate"):
+
+                state["hover_square"] = (row, col)
+
+                state["hover_moves"] = get_remaining_moves_for_square(gs,row,col,)
+
         window.fill((20, 20, 25))
         draw_battle_panels(window)
         draw_ability_panel(window)
         chess_board(window,BOARD_RECT)
 
-        is_white_view = (
-            state["player_color"] == "w"
-        )
+        is_white_view = (state["player_color"] == "w")
 
-        highlight_moves(
-            window,
-            state["valid_moves"],
-            BOARD_RECT,
-            is_white=is_white_view
-        )
-
-        draw_pieces(
-            window,
-            gs.board,
-            images,
-            BOARD_RECT,
-            is_white=is_white_view
-        )
+        highlight_moves(window,state["valid_moves"],BOARD_RECT,is_white=is_white_view)
+        draw_hover_moves(window,BOARD_RECT,is_white=is_white_view)
+        draw_pieces(window,gs.board,images,BOARD_RECT,is_white=is_white_view)
 
         pygame.display.flip()
         clock.tick(60)
