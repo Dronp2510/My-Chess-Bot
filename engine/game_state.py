@@ -1,6 +1,8 @@
+from collections import defaultdict
+
 from engine.move import Move
 from engine.fen import board_to_fen, fen_to_board, metadata_to_string, string_to_metadata
-from engine.zobrist import compute_full_hash
+from engine.zobrist import compute_full_hash, status_key
 from engine.constants import *
 from copy import deepcopy
 
@@ -40,6 +42,11 @@ class GameState:
 
         # Zobrist Hashing
         self.position_hash = 0
+        # Running XOR contribution of status effects (Fortunate/Misfortunate/
+        # etc.) currently folded into position_hash. Tracked separately so
+        # we can cheaply "subtract" the old contribution before folding in
+        # a new one -- see recompute_status_hash().
+        self._status_hash_component = 0
         self.initialize_hash()
 
         # FEN Notation
@@ -179,6 +186,11 @@ class GameState:
 
         self.move_log.clear()
 
+        # NOTE (cleanup item from review): this discards the
+        # {"powers": {}, "status_effects": {}, "campaign": {}} schema set in
+        # __init__. Left as-is for now since fixing it is a metadata-schema
+        # decision, not part of the Phase 0 bug list -- flagging again here
+        # so it isn't silently lost.
         self.metadata = {}
 
         self._refresh_after_fen()
@@ -214,6 +226,8 @@ class GameState:
                     self.black_king_pos = (r, c)
 
         self.position_hash = compute_full_hash(self)
+        self._status_hash_component = 0
+        self.recompute_status_hash()
 
     def _update_castling_rights(self, move):
 
@@ -350,6 +364,50 @@ class GameState:
             "Fortunate"
         )
 
+    @staticmethod
+    def _captured_square(move):
+        """
+        The square a captured piece actually occupies. Almost always
+        move.end_square -- EXCEPT en passant, where the captured pawn sits
+        at (start_row, end_col), not (end_row, end_col). Fixes Issue D's
+        legality half: without this, a Fortunate pawn could be illegally
+        removed via en passant because the old Fortunate check only ever
+        looked at end_row/end_col.
+        """
+        if move.is_en_passant_move:
+            return (move.start_row, move.end_col)
+        return (move.end_row, move.end_col)
+
+    def _compute_status_hash(self):
+        """Full recompute of the status-effect hash contribution from
+        scratch. Cheap in practice: called only on move make/undo and FEN
+        load, not per search node beyond that, and the status dict is
+        small (a handful of active effects at most)."""
+        h = 0
+
+        if self.battle_state is not None:
+            for square, effects in self.battle_state.statuses.items():
+                row, col = square
+                for effect in effects:
+                    h ^= status_key(row, col, effect.name)
+
+        return h
+
+    def recompute_status_hash(self):
+        """
+        Keep position_hash in sync with battle_state.statuses (Issue C).
+
+        Without this, two positions with identical pieces but different
+        Fortunate/Misfortunate statuses collide in the transposition
+        table, and the bot could see a false TT hit for a status it isn't
+        actually facing. Call this any time battle_state.statuses changes:
+        this method already handles it internally after make_move/undo,
+        but ability activation happens OUTSIDE make_move (see main.py), so
+        callers there must call this explicitly after add_status().
+        """
+        self.position_hash ^= self._status_hash_component
+        self._status_hash_component = self._compute_status_hash()
+        self.position_hash ^= self._status_hash_component
 
     def make_move(self, move):
         # counting calls 
@@ -364,6 +422,8 @@ class GameState:
 
         if self.battle_state is not None:
             move.prev_status_snapshot = (self.battle_state.snapshot_statuses())
+        else:
+            move.prev_status_snapshot = {}
         
         sr = move.start_row
         sc = move.start_col
@@ -427,6 +487,14 @@ class GameState:
                 ][captured_row][ec]
             self.board[sr][ec] = '--'
 
+            # Issue D (status half): the captured pawn's square is
+            # (sr, ec), NOT move.end_square, which is where
+            # move_piece_status() above just looked. Without this, a
+            # status sitting on the captured pawn is left behind as a
+            # ghost entry forever instead of being removed with the pawn.
+            if self.battle_state is not None:
+                self.battle_state.clear_statuses((sr, ec))
+
         self.board[sr][sc] = "--"
 
         # Pawn promotion
@@ -483,6 +551,11 @@ class GameState:
         opponent_side = ("b" if moved_side == "w" else "w")
         if self.battle_state is not None:
             self.battle_state.tick_statuses_for_color(opponent_side)
+
+        # Fold in whatever the status set looks like after this move
+        # (piece relocation + en passant cleanup + turn-end ticking).
+        # Must run AFTER all of the above status mutations.
+        self.recompute_status_hash()
 
         self.white_to_move = not self.white_to_move
 
@@ -541,8 +614,13 @@ class GameState:
         self.white_king_pos = move.prev_white_king_pos
         self.black_king_pos = move.prev_black_king_pos
 
-        if (self.battle_state is not None and move.prev_status_snapshot is not None):
+        if self.battle_state is not None:
             self.battle_state.restore_statuses(move.prev_status_snapshot)
+            # position_hash was already fully restored via move.prev_hash
+            # above (captured before this move touched anything), so we
+            # only need to resync the cached component tracker here --
+            # NOT re-XOR it into position_hash again.
+            self._status_hash_component = self._compute_status_hash()
 
         # switch turns back
         self.white_to_move = not self.white_to_move
@@ -630,7 +708,62 @@ class GameState:
                         all_moves.extend(moves)
 
         return all_moves
-    
+
+    # ============================================================
+    # STATUS-AWARE MOVE FILTERING (Issue B)
+    # ============================================================
+    #
+    # get_valid_moves()/get_all_valid_moves() below already apply status
+    # filtering, but they're the PLAYER-facing, fully-legality-checked path
+    # (each call does a make_move/undo_move round trip to test king safety).
+    # The bot's negamax()/quiescence() never called them -- they called
+    # get_all_pseudo_moves()/get_all_capture_moves() directly and did their
+    # own legality check via move_is_legal(). That meant status effects were
+    # invisible to search below the root. These helpers apply the same
+    # Fortunate/Misfortunate filtering to an arbitrary move list WITHOUT
+    # doing a legality check, so chess_bot.py can filter pseudo-moves before
+    # searching them and still do its own make_move + move_is_legal() pass.
+
+    def _apply_status_filters(self, moves):
+
+        if self.battle_state is None or not moves:
+            return moves
+
+        # ---- Fortunate: remove any move that captures a Fortunate piece ----
+        survivors = []
+        for move in moves:
+            if move.piece_captured != "--":
+                target_row, target_col = self._captured_square(move)
+                if self.is_fortunate_square(target_row, target_col):
+                    continue
+            survivors.append(move)
+
+        # ---- Misfortunate: reduce move count per originating square ----
+        grouped = defaultdict(list)
+        for move in survivors:
+            grouped[(move.start_row, move.start_col)].append(move)
+
+        from game.status_processors import apply_misfortunate_filter
+
+        result = []
+        for square, square_moves in grouped.items():
+            misfortunate = self.battle_state.get_status(square, "Misfortunate")
+            if misfortunate is not None:
+                square_moves = apply_misfortunate_filter(square_moves, misfortunate)
+            result.extend(square_moves)
+
+        return result
+
+    def get_all_pseudo_moves_status_filtered(self):
+        """What chess_bot.py's negamax() should iterate over instead of
+        get_all_pseudo_moves(), once a battle is in progress."""
+        return self._apply_status_filters(self.get_all_pseudo_moves())
+
+    def get_all_capture_moves_status_filtered(self):
+        """What chess_bot.py's quiescence() should iterate over instead of
+        get_all_capture_moves()."""
+        return self._apply_status_filters(self.get_all_capture_moves())
+
     def get_valid_moves(self, position):
 
         legal_moves = []
@@ -652,7 +785,8 @@ class GameState:
             # FORTUNATE PIECE FILTER
             # ----------------------------------
             if move.piece_captured != "--":
-                if self.is_fortunate_square(move.end_row,move.end_col):
+                target_row, target_col = self._captured_square(move)
+                if self.is_fortunate_square(target_row, target_col):
                     continue
 
             self.make_move(move)
@@ -1281,6 +1415,8 @@ class GameState:
             h ^= en_passant_keys[ep_file]
 
         self.position_hash = h
+        self._status_hash_component = 0
+        self.recompute_status_hash()
 
     def verify_hash(self):
 

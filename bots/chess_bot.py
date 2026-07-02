@@ -221,6 +221,29 @@ def _has_enough_material_for_null(gs):
     return material >= piece_score["b"]
 
 
+def _get_pseudo_moves_for_search(gs):
+    """
+    Issue B fix: previously this call site used gs.get_all_pseudo_moves(),
+    which knows nothing about Fortunate/Misfortunate. That let the bot
+    search lines deep in the tree where it "captures" an uncapturable
+    Fortunate piece, or ignores a Misfortunate move restriction that the
+    real root position enforces -- the search tree and the actual legal
+    game were silently out of sync. get_all_pseudo_moves_status_filtered()
+    applies the same Fortunate/Misfortunate filtering get_valid_moves()
+    already used for the player, without paying for a legality check here
+    (negamax/quiescence already do their own via move_is_legal()).
+    """
+    if gs.battle_state is None:
+        return gs.get_all_pseudo_moves()
+    return gs.get_all_pseudo_moves_status_filtered()
+
+
+def _get_capture_moves_for_search(gs):
+    if gs.battle_state is None:
+        return gs.get_all_capture_moves()
+    return gs.get_all_capture_moves_status_filtered()
+
+
 def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_null=True):
     global nodes_searched
     global cutoffs
@@ -291,7 +314,7 @@ def negamax(gs, depth, alpha, beta, ply=0, evaluator=None, deadline=None, allow_
     #         transposition_table[hash_key] = (depth, beta, LOWERBOUND, None)
     #         return beta
 
-    pseudo_moves = gs.get_all_pseudo_moves()
+    pseudo_moves = _get_pseudo_moves_for_search(gs)
     pseudo_moves.sort(
         key=lambda move: move_ordering(move, tt_move, ply),
         reverse=True
@@ -552,7 +575,7 @@ def quiescence(gs, alpha, beta, depth=0, evaluator=None, deadline=None):
     if stand_pat > alpha:
         alpha = stand_pat
 
-    capture_moves = gs.get_all_capture_moves()
+    capture_moves = _get_capture_moves_for_search(gs)
     if len(capture_moves) > 1:
         capture_moves.sort(key=move_ordering, reverse=True)
 

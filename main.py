@@ -242,6 +242,17 @@ def get_remaining_moves_for_square(gs, row, col):
 def create_game(player_color="w"):
     gs = GameState()
     battle_state = BattleState(FortunePath(stage=5))
+
+    # ------------------------------------------------------------------
+    # Issue A fix: this line was missing entirely. Without it,
+    # gs.battle_state stays None (GameState.__init__'s default), which
+    # means is_fortunate_square(), the Misfortunate filter in
+    # get_valid_moves(), and every status snapshot/restore/hash hook in
+    # make_move()/undo_move() were silently dead code -- abilities drew
+    # visuals but had zero effect on legal move generation.
+    # ------------------------------------------------------------------
+    gs.battle_state = battle_state
+
     return {
         "gs": gs,
         "battle_state": battle_state,
@@ -252,7 +263,18 @@ def create_game(player_color="w"):
         "selected_ability": None,
         "ability_buttons": [],
         "ability_targeting": False,
+        # Issue E fix: cached result of gs.get_game_state(), refreshed only
+        # via refresh_game_status() after an actual move/ability, instead
+        # of recomputing full legal-move generation for both sides every
+        # single 60fps render tick regardless of whether anything changed.
+        "game_status": "ongoing",
     }
+
+def refresh_game_status():
+    """Call after any action that could change whether the game is over:
+    a move being made (player or bot). Deliberately NOT called every
+    frame -- see Issue E."""
+    state["game_status"] = gs.get_game_state()
 
 state = create_game("w")
 gs = state["gs"]
@@ -266,7 +288,7 @@ def sync_bot_turn():
     global state, gs
     if not run:
         return
-    if gs.get_game_state() != "ongoing":
+    if state["game_status"] != "ongoing":
         return
 
     if current_turn_color(gs) != state["bot_color"]:
@@ -274,7 +296,7 @@ def sync_bot_turn():
 
     bot_moves = gs.get_all_valid_moves()
     if not bot_moves:
-        gs.get_game_state()
+        refresh_game_status()
         return
 
     move = find_best_move(
@@ -287,6 +309,7 @@ def sync_bot_turn():
 
     if move:
         gs.make_move(move)
+        refresh_game_status()
 
     state["selected_square"] = None
     state["valid_moves"] = []
@@ -330,7 +353,7 @@ def start_chess_battle(player_color="w"):
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                if gs.get_game_state() != "ongoing":
+                if state["game_status"] != "ongoing":
                     continue
 
                 if current_turn_color(gs) != state["player_color"]:
@@ -388,6 +411,16 @@ def start_chess_battle(player_color="w"):
                         state["ability_targeting"] = False
                         state["selected_ability"] = None
 
+                        # ------------------------------------------------
+                        # Follow-through on Issue C: abilities mutate
+                        # battle_state.statuses OUTSIDE of make_move(), so
+                        # gs.position_hash's status contribution would go
+                        # stale here unless we explicitly resync it. This
+                        # keeps the transposition table honest about the
+                        # position the bot is actually about to search.
+                        # ------------------------------------------------
+                        gs.recompute_status_hash()
+
                     state["selected_square"] = None
                     state["valid_moves"] = []
 
@@ -428,6 +461,15 @@ def start_chess_battle(player_color="w"):
 
                     if move in state["valid_moves"]:
 
+                        # NOTE: gs.make_move() below already calls
+                        # battle_state.move_piece_status() internally, and
+                        # now also handles the en-passant status-cleanup
+                        # case (Issue D) and the castling-rook status move
+                        # below. This explicit pre-call for the main piece
+                        # is redundant with that internal call but kept
+                        # harmless (moving an already-moved/empty key is a
+                        # no-op) to avoid touching call order beyond what
+                        # Phase 0 requires.
                         state["battle_state"].move_piece_status((move.start_row, move.start_col),(move.end_row, move.end_col))
 
                         if move.is_castle_move:
@@ -438,10 +480,11 @@ def start_chess_battle(player_color="w"):
                                 state["battle_state"].move_piece_status((move.start_row, 0),(move.start_row, 3))
 
                         gs.make_move(move)
+                        refresh_game_status()
                         state["selected_square"] = None
                         state["valid_moves"] = []
 
-        if gs.get_game_state() == "ongoing":
+        if state["game_status"] == "ongoing":
             sync_bot_turn()
 
         mouse_pos = pygame.mouse.get_pos()

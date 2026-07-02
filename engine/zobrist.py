@@ -1,4 +1,5 @@
 import random
+import hashlib
 
 random.seed(2025)
 
@@ -32,6 +33,23 @@ en_passant_keys = [
     random.getrandbits(64)
     for _ in range(8)
 ]
+
+
+def status_key(row, col, status_name):
+    """
+    Deterministic 64-bit key for a status effect occupying a square.
+
+    IMPORTANT: unlike the piece/castling/en-passant keys above, this is NOT
+    generated from the module-level `random` sequence. Status names are
+    defined per-Path (Fortune, future Paths, etc.) and we don't want key
+    generation order -- which depends on import order across an expanding
+    set of Path modules -- to silently change historical hash values.
+    Hashing a stable string instead makes this key reproducible forever,
+    regardless of how many Paths get added later.
+    """
+    raw = f"status|{row}|{col}|{status_name}".encode("utf-8")
+    return int.from_bytes(hashlib.sha256(raw).digest()[:8], "big")
+
 
 def compute_full_hash(gs):
 
