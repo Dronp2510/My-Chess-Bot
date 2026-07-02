@@ -40,6 +40,10 @@ class GameState:
         self.valid_move_calls = 0
         self.all_valid_move_calls = 0
 
+        # Main Game Classes
+
+        self.battle_state = None
+        
         # Zobrist Hashing
         self.position_hash = 0
         # Running XOR contribution of status effects (Fortunate/Misfortunate/
@@ -58,9 +62,6 @@ class GameState:
         self.halfmove_clock = 0
         self.fullmove_number = 1
 
-        # Main Game Classes
-
-        self.battle_state = None
 
     # ============================================================
     # HELPERS
