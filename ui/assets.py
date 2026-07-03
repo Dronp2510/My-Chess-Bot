@@ -1,543 +1,287 @@
+# ============================================================
+# File: ui/assets.py
+# ============================================================
+
 """
-assets.py
-=========
+War Chess
+UI-2.A - Asset Pipeline
 
-Global Asset Manager for War Chess.
+Public Asset API
 
-Responsibilities
-----------------
-• Locate the project's asset directory
-• Load and cache images
-• Load and cache fonts
-• Prevent duplicate asset loading
-• Provide a single interface for all UI assets
+This is the ONLY asset module that should be imported
+by the rest of the UI and game.
 
-IMPORTANT
----------
-Widgets and screens should NEVER call pygame.image.load()
-or pygame.font.Font() directly.
+Example:
 
-Always use the global `assets` instance.
+    from ui.assets import Assets
 
-Future versions of this manager will also support:
+    image = Assets.texture(...)
+    piece = Assets.piece(...)
+    animation = Assets.animation(...)
+    button = Assets.button(...)
 
-    - Audio
-    - Sprite atlases
-    - Animation sheets
-    - Nine-slice textures
-    - Async loading
-    - Loading screens
+The implementation behind this API can change without
+affecting any other part of the project.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import TypeAlias
+
+AssetPath: TypeAlias = str | Path
+Size: TypeAlias = tuple[int, int]
 
 import pygame
 
+from .resources.loader import asset_loader
+from .resources.spritesheet import sprite_sheet_loader
+from .resources.animations import animation_loader, Animation
+from .resources.chess_cache import chess_piece_manager
+from .resources.button_cache import (
+    button_skin_manager,
+    ButtonSkin,
+)
+from .resources.cache import asset_cache
 
-# ============================================================
-# Asset Manager
-# ============================================================
 
 
-class AssetManager:
+class Assets:
     """
-    Global asset cache.
-
-    Every image, font and sound should be requested
-    through this manager.
-
-    Assets are loaded exactly once.
+    Public façade for the entire UI asset system.
     """
 
-    def __init__(self) -> None:
+    # =====================================================
+    # TEXTURES
+    # =====================================================
 
-        self._initialized = False
-
-        self.project_root = self._discover_project_root()
-
-        self.asset_root = self._discover_asset_directory()
-
-        self._image_cache: Dict[Tuple[str, Optional[Tuple[int, int]]], pygame.Surface] = {}
-
-        self._font_cache: Dict[Tuple[str, int], pygame.font.Font] = {}
-
-    # --------------------------------------------------------
-    # Initialization
-    # --------------------------------------------------------
-
-    def initialize(self) -> None:
-        """
-        Initializes pygame font module if necessary.
-
-        Safe to call multiple times.
-        """
-
-        if self._initialized:
-            return
-
-        if not pygame.font.get_init():
-            pygame.font.init()
-
-        self._initialized = True
-
-    # ========================================================
-    # Project Discovery
-    # ========================================================
-
-    def _discover_project_root(self) -> Path:
-        """
-        Attempts to locate the project root.
-
-        assets.py lives inside:
-
-            Project/ui/assets.py
-
-        Therefore parent.parent should always be the root.
-        """
-
-        return Path(__file__).resolve().parent.parent
-
-    def _discover_asset_directory(self) -> Path:
-        """
-        Locate Assets/ or assets/.
-
-        Raises
-        ------
-        FileNotFoundError
-            If neither directory exists.
-        """
-
-        candidates = [
-            self.project_root / "Assets",
-            self.project_root / "assets",
-        ]
-
-        for folder in candidates:
-            if folder.exists():
-                return folder
-
-        raise FileNotFoundError(
-            "Unable to locate Assets/ directory."
-        )
-
-    # ========================================================
-    # Path Helpers
-    # ========================================================
-
-    def asset_path(self, relative_path: str) -> Path:
-        """
-        Returns an absolute path inside Assets.
-
-        Example
-        -------
-
-        assets.asset_path("ui/button.png")
-        """
-
-        return self.asset_root / relative_path
-
-    def exists(self, relative_path: str) -> bool:
-        """
-        Returns True if an asset exists.
-        """
-
-        return self.asset_path(relative_path).exists()
-
-    # ========================================================
-    # Images
-    # ========================================================
-
-    def load_image(
-        self,
-        relative_path: str,
-        size: Optional[Tuple[int, int]] = None,
-        alpha: bool = True,
+    @staticmethod
+    def texture(
+        path: AssetPath,
     ) -> pygame.Surface:
         """
-        Load an image from disk.
+        Load a texture.
 
-        Results are cached automatically.
-
-        Parameters
-        ----------
-        relative_path
-            Path relative to Assets/
-
-        size
-            Optional resize.
-
-        alpha
-            Preserve transparency.
+        Cached automatically.
         """
+        return asset_loader.load_texture(path)
 
-        cache_key = (relative_path, size)
-
-        if cache_key in self._image_cache:
-            return self._image_cache[cache_key]
-
-        path = self.asset_path(relative_path)
-
-        if not path.exists():
-            raise FileNotFoundError(path)
-
-        image = pygame.image.load(str(path))
-
-        if alpha:
-            image = image.convert_alpha()
-        else:
-            image = image.convert()
-
-        if size is not None:
-            image = pygame.transform.smoothscale(
-                image,
-                size,
-            )
-
-        self._image_cache[cache_key] = image
-
-        return image
-
-    # ========================================================
-    # Fonts
-    # ========================================================
-
-    def load_font(
-        self,
-        font_name: str,
-        size: int,
-    ) -> pygame.font.Font:
+    @staticmethod
+    def scaled_texture(
+        path: AssetPath,
+        size: Size,
+    ) -> pygame.Surface:
         """
-        Load a font.
+        Load a scaled texture.
 
-        If font_name is unavailable on the system,
-        pygame will gracefully fall back.
+        Each size is cached independently.
         """
-
-        self.initialize()
-
-        cache_key = (font_name, size)
-
-        if cache_key in self._font_cache:
-            return self._font_cache[cache_key]
-
-        font = pygame.font.SysFont(
-            font_name,
+        return asset_loader.load_scaled_texture(
+            path,
             size,
         )
 
-        self._font_cache[cache_key] = font
+    # =====================================================
+    # SPRITE SHEETS
+    # =====================================================
 
-        return font
-
-    # ========================================================
-    # Convenience
-    # ========================================================
-
-    def image(
-        self,
-        relative_path: str,
-        size: Optional[Tuple[int, int]] = None,
-    ) -> pygame.Surface:
+    @staticmethod
+    def spritesheet(
+        path: AssetPath,
+    ):
         """
-        Alias for load_image().
+        Load a sprite sheet.
         """
+        return sprite_sheet_loader.load(path)
 
-        return self.load_image(
-            relative_path,
-            size=size,
+    # =====================================================
+    # ANIMATIONS
+    # =====================================================
+
+    @staticmethod
+    def animation(
+        name: str,
+    ) -> Animation:
+        """
+        Retrieve a cached animation.
+        """
+        return animation_loader.get(name)
+
+    @staticmethod
+    def load_animation_folder(
+        name: str,
+        folder: AssetPath,
+        fps: int = 12,
+        loop: bool = True,
+    ) -> Animation:
+
+        return animation_loader.from_folder(
+            name=name,
+            folder=folder,
+            fps=fps,
+            loop=loop,
         )
 
-    def font(
-        self,
-        font_name: str,
-        size: int,
-    ) -> pygame.font.Font:
-        """
-        Alias for load_font().
-        """
+    @staticmethod
+    def load_animation_sheet(
+        name: str,
+        sheet_path: AssetPath,
+        row: int,
+        start: int,
+        end: int,
+        frame_width: int,
+        frame_height: int,
+        fps: int = 12,
+        loop: bool = True,
+        margin: int = 0,
+        spacing: int = 0,
+    ) -> Animation:
 
-        return self.load_font(
-            font_name,
+        return animation_loader.from_sheet(
+            name=name,
+            sheet_path=sheet_path,
+            row=row,
+            start=start,
+            end=end,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            fps=fps,
+            loop=loop,
+            margin=margin,
+            spacing=spacing,
+        )
+
+    @staticmethod
+    def load_animation_frames(
+        name: str,
+        frames: list[pygame.Surface],
+        fps: int = 12,
+        loop: bool = True,
+    ) -> Animation:
+
+        return animation_loader.from_frames(
+            name=name,
+            frames=frames,
+            fps=fps,
+            loop=loop,
+        )
+
+    # =====================================================
+    # CHESS PIECES
+    # =====================================================
+
+    @staticmethod
+    def piece(
+        color: str,
+        piece: str,
+    ) -> pygame.Surface:
+        """
+        Retrieve a chess piece.
+        """
+        return chess_piece_manager.get(
+            color,
+            piece,
+        )
+
+    @staticmethod
+    def scaled_piece(
+        color: str,
+        piece: str,
+        size: Size,
+    ) -> pygame.Surface:
+        """
+        Retrieve a scaled chess piece.
+        """
+        return chess_piece_manager.get_scaled(
+            color,
+            piece,
             size,
         )
 
-    # ========================================================
-    # Cache Information
-    # ========================================================
-
-    @property
-    def image_count(self) -> int:
+    @staticmethod
+    def preload_pieces() -> None:
         """
-        Number of cached images.
+        Load every chess piece into memory.
         """
+        chess_piece_manager.preload()
 
-        return len(self._image_cache)
+    # =====================================================
+    # BUTTONS
+    # =====================================================
 
-    @property
-    def font_count(self) -> int:
+    @staticmethod
+    def button(
+        name: str,
+    ) -> ButtonSkin:
         """
-        Number of cached fonts.
+        Retrieve a loaded button skin.
         """
+        return button_skin_manager.get(name)
 
-        return len(self._font_cache)
+    @staticmethod
+    def load_button_sheet(
+        name: str,
+        sheet_path: AssetPath,
+        frame_width: int,
+        frame_height: int,
+        row: int = 0,
+        state_order: tuple[str, ...] = (
+            "idle",
+            "hover",
+            "pressed",
+            "disabled",
+        ),
+        margin: int = 0,
+        spacing: int = 0,
+    ) -> ButtonSkin:
 
-# ============================================================
-# Sounds
-# ============================================================
-
-    def load_sound(
-        self,
-        relative_path: str,
-    ) -> pygame.mixer.Sound:
-        """
-        Load a sound effect.
-
-        Sounds are cached automatically.
-        """
-
-        if not pygame.mixer.get_init():
-            pygame.mixer.init()
-
-        if not hasattr(self, "_sound_cache"):
-            self._sound_cache: Dict[str, pygame.mixer.Sound] = {}
-
-        if relative_path in self._sound_cache:
-            return self._sound_cache[relative_path]
-
-        path = self.asset_path(relative_path)
-
-        if not path.exists():
-            raise FileNotFoundError(path)
-
-        sound = pygame.mixer.Sound(str(path))
-
-        self._sound_cache[relative_path] = sound
-
-        return sound
-
-
-# ============================================================
-# Preloading
-# ============================================================
-
-    def preload_images(
-        self,
-        assets: list[str],
-    ) -> None:
-        """
-        Preload multiple images.
-        """
-
-        for asset in assets:
-            self.load_image(asset)
-
-    def preload_sounds(
-        self,
-        assets: list[str],
-    ) -> None:
-        """
-        Preload multiple sounds.
-        """
-
-        for asset in assets:
-            self.load_sound(asset)
-
-
-# ============================================================
-# Cache Management
-# ============================================================
-
-    def clear_image_cache(self) -> None:
-
-        self._image_cache.clear()
-
-    def clear_font_cache(self) -> None:
-
-        self._font_cache.clear()
-
-    def clear_sound_cache(self) -> None:
-
-        if hasattr(self, "_sound_cache"):
-            self._sound_cache.clear()
-
-    def clear(self) -> None:
-        """
-        Clear every cache.
-        """
-
-        self.clear_image_cache()
-        self.clear_font_cache()
-        self.clear_sound_cache()
-
-
-# ============================================================
-# Statistics
-# ============================================================
-
-    @property
-    def sound_count(self) -> int:
-
-        if not hasattr(self, "_sound_cache"):
-            return 0
-
-        return len(self._sound_cache)
-
-    @property
-    def total_cached_assets(self) -> int:
-
-        return (
-            self.image_count
-            + self.font_count
-            + self.sound_count
+        return button_skin_manager.from_sheet(
+            name=name,
+            sheet_path=sheet_path,
+            frame_width=frame_width,
+            frame_height=frame_height,
+            row=row,
+            state_order=state_order,
+            margin=margin,
+            spacing=spacing,
         )
 
+    @staticmethod
+    def load_button_images(
+        name: str,
+        **states,
+    ) -> ButtonSkin:
 
-# ============================================================
-# Validation
-# ============================================================
+        return button_skin_manager.from_images(
+            name=name,
+            **states,
+        )
 
-    def validate_asset(
-        self,
-        relative_path: str,
+    # =====================================================
+    # CACHE
+    # =====================================================
+
+    @staticmethod
+    def clear_cache() -> None:
+        """
+        Clears every asset cache.
+        """
+        asset_cache.clear()
+
+    @staticmethod
+    def cache_statistics() -> dict[str, int]:
+        """
+        Returns cache statistics.
+        """
+        return asset_cache.statistics()
+
+    # =====================================================
+    # DEBUG
+    # =====================================================
+
+    @staticmethod
+    def is_loaded(
+        path: AssetPath,
     ) -> bool:
-        """
-        Returns True if an asset exists.
-        """
 
-        return self.asset_path(relative_path).exists()
-
-
-# ============================================================
-# Future Atlas Hooks
-# ============================================================
-
-    def load_sprite_atlas(
-        self,
-        relative_path: str,
-    ) -> pygame.Surface:
-        """
-        Placeholder for future sprite atlas support.
-
-        Currently behaves exactly like load_image().
-        """
-
-        return self.load_image(relative_path)
-
-    def load_nine_slice(
-        self,
-        relative_path: str,
-    ) -> pygame.Surface:
-        """
-        Placeholder for future nine-slice support.
-
-        Currently behaves exactly like load_image().
-        """
-
-        return self.load_image(relative_path)
-
-
-# ============================================================
-# Theme Font Helpers
-# ============================================================
-
-    def title_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.title_size,
-        )
-
-    def heading_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.heading_size,
-        )
-
-    def subheading_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.subheading_size,
-        )
-
-    def body_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.body_size,
-        )
-
-    def caption_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.caption_size,
-        )
-
-    def small_font(self, theme):
-
-        return self.font(
-            theme.typography.font_name,
-            theme.typography.small_size,
-        )
-
-
-# ============================================================
-# Debug
-# ============================================================
-
-    def cache_statistics(self) -> dict[str, int]:
-        """
-        Returns cache information useful for debugging.
-        """
-
-        return {
-            "images": self.image_count,
-            "fonts": self.font_count,
-            "sounds": self.sound_count,
-            "total": self.total_cached_assets,
-        }
-
-
-# ============================================================
-# Convenience Functions
-# ============================================================
-
-
-def image(
-    relative_path: str,
-    size: Optional[Tuple[int, int]] = None,
-) -> pygame.Surface:
-    return assets.image(relative_path, size)
-
-
-def font(
-    font_name: str,
-    size: int,
-) -> pygame.font.Font:
-    return assets.font(font_name, size)
-
-
-def sound(
-    relative_path: str,
-) -> pygame.mixer.Sound:
-    return assets.load_sound(relative_path)
-
-# ============================================================
-# Global Singleton
-# ============================================================
-
-assets = AssetManager()
-
-
-__all__ = [
-    "AssetManager",
-    "assets",
-    "image",
-    "font",
-    "sound",
-]
+        return asset_loader.is_loaded(path)
