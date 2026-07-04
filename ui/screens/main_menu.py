@@ -29,11 +29,10 @@ class MainMenuScreen(Screen):
     the individual systems themselves.
     """
 
-    def __init__(self, screen_size: tuple[int, int]):
+    def __init__(self, manager):
 
-        super().__init__()
+        super().__init__(manager)
 
-        self.width, self.height = screen_size
 
         # -------------------------------------------------
         # Background Layers
@@ -88,15 +87,21 @@ class MainMenuScreen(Screen):
             self.height,
         )
 
+
         # -------------------------------------------------
         # UI
         # -------------------------------------------------
 
         self.title = None
 
+        # Root widget hierarchy
+        self.widgets = []
+
         self.menu_panel = None
 
         self.buttons = []
+
+        self._build_ui()
 
         # -------------------------------------------------
         # Animation
@@ -110,9 +115,8 @@ class MainMenuScreen(Screen):
 
         self.chess_pieces = self._load_chess_pieces()
 
-        #
-        # Populate systems
-        #
+
+    def on_first_enter(self):
 
         self._populate_orbits()
 
@@ -120,27 +124,28 @@ class MainMenuScreen(Screen):
 
     # -----------------------------------------------------
 
-    def on_enter(self):
+    def enter(self):
 
-        """Called when the screen becomes active."""
+        super().enter()
+
         self.elapsed = 0.0
 
     # -----------------------------------------------------
+    
+    def exit(self):
 
-    def on_exit(self):
-
-        """Called before leaving the screen."""
+        super().exit()
 
     # -----------------------------------------------------
 
     def resize(
         self,
-        width: int,
-        height: int,
+        size: tuple[int, int],
     ):
 
-        self.width = width
-        self.height = height
+        super().resize(size)
+
+        width, height = size
 
         for layer in self.background_layers:
             layer.resize(width, height)
@@ -163,6 +168,16 @@ class MainMenuScreen(Screen):
 
         self._populate_falling()
 
+        if self.menu_panel:
+
+            panel_width = 420
+            panel_height = 520
+
+            self.menu_panel.rect.x = 70
+            self.menu_panel.rect.y = (
+                self.height // 2 - panel_height // 2
+            )
+
     # -----------------------------------------------------
 
     def update(
@@ -181,6 +196,9 @@ class MainMenuScreen(Screen):
 
         self.falling.update(dt)
 
+        for widget in self.widgets:
+            widget.update(dt)
+    
     # -----------------------------------------------------
 
     def draw(
@@ -208,7 +226,9 @@ class MainMenuScreen(Screen):
         #
         # Widgets
         #
-        # Implemented in Part-8C
+
+        for widget in self.widgets:
+            widget.draw(surface)
 
     # -----------------------------------------------------
 
@@ -223,6 +243,11 @@ class MainMenuScreen(Screen):
                 event.w,
                 event.h,
             )
+
+            return
+
+        for widget in reversed(self.widgets):
+            widget.handle_event(event)
     
     @property
     def center(self):
@@ -237,6 +262,60 @@ class MainMenuScreen(Screen):
     def black_hole_center(self):
 
         return self.black_hole.position
+
+
+    def _build_ui(self):
+        """
+        Construct the widget hierarchy.
+
+        Visual styling remains inside the widget classes.
+        This screen is only responsible for composition.
+        """
+
+        # Imported locally to avoid circular imports.
+        from ui.widgets.panel import Panel
+        from ui.widgets.button import MenuButton
+
+        panel_width = 420
+        panel_height = 520
+
+        self.menu_panel = Panel(
+            x=70,
+            y=self.height // 2 - panel_height // 2,
+            width=panel_width,
+            height=panel_height,
+        )
+
+        labels = (
+            "Play",
+            "Load Game",
+            "Settings",
+            "Exit",
+        )
+
+        button_width = 300
+        button_height = 70
+
+        start_y = 110
+        spacing = 88
+
+        self.buttons.clear()
+
+        for index, text in enumerate(labels):
+
+            button = MenuButton(
+                x=(panel_width - button_width) // 2,
+                y=start_y + index * spacing,
+                width=button_width,
+                height=button_height,
+                text=text,
+            )
+
+            self.menu_panel.add_child(button)
+
+            self.buttons.append(button)
+
+        self.widgets = [self.menu_panel]
 
 
     def _load_chess_pieces(self) -> list[pygame.Surface]:

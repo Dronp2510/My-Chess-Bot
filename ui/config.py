@@ -62,3 +62,17 @@ MENU_WIDTH = 420
 MENU_BUTTON_SPACING = 20
 
 MENU_ANIMATION_TIME = 0.45
+
+# ---------------------------------------------------------
+# Window
+# ---------------------------------------------------------
+
+WINDOW_TITLE = "War Chess"
+
+WINDOW_WIDTH = 1400
+
+WINDOW_HEIGHT = 900
+
+TARGET_FPS = 60
+
+BACKGROUND_COLOR = (8, 8, 12)
