@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pygame
+import random
 
 from ui.screen import Screen
 from ui import config
@@ -15,6 +16,8 @@ from ui.backgrounds import (
 from ui.effects.black_hole import BlackHole
 from ui.effects.orbit_system import OrbitSystem
 from ui.effects.falling_pieces import FallingSystem
+
+from ui.resources.chess_cache import chess_piece_manager
 
 
 class MainMenuScreen(Screen):
@@ -101,11 +104,26 @@ class MainMenuScreen(Screen):
 
         self.elapsed = 0.0
 
+        #
+        # Cached Assets
+        #
+
+        self.chess_pieces = self._load_chess_pieces()
+
+        #
+        # Populate systems
+        #
+
+        self._populate_orbits()
+
+        self._populate_falling()
+
     # -----------------------------------------------------
 
     def on_enter(self):
 
         """Called when the screen becomes active."""
+        self.elapsed = 0.0
 
     # -----------------------------------------------------
 
@@ -142,6 +160,8 @@ class MainMenuScreen(Screen):
         self.orbits.set_center(
             self.black_hole.position
         )
+
+        self._populate_falling()
 
     # -----------------------------------------------------
 
@@ -217,3 +237,78 @@ class MainMenuScreen(Screen):
     def black_hole_center(self):
 
         return self.black_hole.position
+
+
+    def _load_chess_pieces(self) -> list[pygame.Surface]:
+        """
+        Load all chess pieces once.
+
+        The returned list is reused by the orbit and
+        falling systems.
+        """
+
+        pieces = []
+
+        colors = (
+            "white",
+            "black",
+        )
+
+        names = (
+            "king",
+            "queen",
+            "rook",
+            "bishop",
+            "knight",
+            "pawn",
+        )
+
+        for color in colors:
+            for piece in names:
+                pieces.append(
+                    chess_piece_manager.get(
+                        color,
+                        piece,
+                    )
+                )
+
+        return pieces
+    
+
+    def _populate_orbits(self):
+
+        self.orbits.clear()
+
+        for _ in range(config.ORBIT_PIECE_COUNT):
+
+            pool = self._piece_pool()
+
+            sprite = next(pool)
+
+            self.orbits.add(sprite)
+
+
+    def _populate_falling(self):
+
+        self.falling.clear()
+
+        for _ in range(config.FALLING_PIECE_COUNT):
+
+            sprite = random.choice(
+                self.chess_pieces
+            )
+
+            self.falling.add(sprite)
+
+    def _piece_pool(self):
+
+        pieces = self.chess_pieces.copy()
+
+        random.shuffle(pieces)
+
+        while True:
+
+            for piece in pieces:
+                yield piece
+
+            random.shuffle(pieces)
