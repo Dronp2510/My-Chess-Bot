@@ -1,0 +1,227 @@
+from __future__ import annotations
+
+import math
+import random
+from dataclasses import dataclass
+
+import pygame
+
+
+@dataclass(slots=True)
+class FallingObject:
+    """
+    Generic falling object.
+
+    Can represent chess pieces,
+    artifacts or future debris.
+    """
+
+    sprite: pygame.Surface
+
+    x: float
+    y: float
+
+    speed: float
+
+    drift_amplitude: float
+    drift_speed: float
+    drift_phase: float
+
+    rotation: float
+    rotation_speed: float
+
+    scale: float
+
+    velocity_scale: float = 1.0
+
+
+class FallingSystem:
+
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        seed: int | None = None,
+    ):
+
+        self.width = width
+        self.height = height
+
+        self.random = random.Random(seed)
+
+        self.objects: list[FallingObject] = []
+
+        self.time = 0.0
+
+    # --------------------------------------------------
+
+    def resize(
+        self,
+        width: int,
+        height: int,
+    ):
+
+        self.width = width
+        self.height = height
+
+    # --------------------------------------------------
+
+    def add(
+        self,
+        sprite: pygame.Surface,
+        *,
+        x: float | None = None,
+        y: float | None = None,
+        speed: float | None = None,
+        scale: float | None = None,
+    ):
+
+        self.objects.append(
+
+            FallingObject(
+
+                sprite=sprite,
+
+                x=self.random.uniform(
+                    0,
+                    self.width,
+                ),
+
+                y=self.random.uniform(
+                    -self.height,
+                    self.height,
+                ),
+
+                speed=self.random.uniform(
+                    35,
+                    110,
+                ),
+
+                drift_amplitude=self.random.uniform(
+                    15,
+                    60,
+                ),
+
+                drift_speed=self.random.uniform(
+                    0.2,
+                    1.2,
+                ),
+
+                drift_phase=self.random.uniform(
+                    0,
+                    math.tau,
+                ),
+
+                rotation=self.random.uniform(
+                    0,
+                    360,
+                ),
+
+                rotation_speed=self.random.uniform(
+                    -35,
+                    35,
+                ),
+
+                scale=self.random.uniform(
+                    0.6,
+                    1.1,
+                ),
+
+            )
+        )
+
+    # --------------------------------------------------
+
+    def clear(self):
+
+        self.objects.clear()
+
+    # --------------------------------------------------
+
+    def update(
+        self,
+        dt: float,
+    ):
+
+        self.time += dt
+
+        for obj in self.objects:
+
+            obj.velocity_scale = min(
+                obj.velocity_scale + dt * 0.08,
+                1.0,
+            )
+
+            obj.y += (
+                obj.speed
+                * obj.velocity_scale
+                * dt
+            )
+
+            obj.rotation += (
+                obj.rotation_speed
+                * dt
+            )
+
+            if obj.y > self.height + 200:
+
+                obj.y = -200
+
+                obj.x = self.random.uniform(
+                    0,
+                    self.width,
+                )
+
+    # --------------------------------------------------
+
+    def draw(
+        self,
+        surface: pygame.Surface,
+    ):
+
+        draw_list = []
+
+        for obj in self.objects:
+
+            x = (
+                obj.x
+                + math.sin(
+                    self.time
+                    * obj.drift_speed
+                    + obj.drift_phase
+                )
+                * obj.drift_amplitude
+            )
+
+            draw_list.append(
+                (
+                    obj.y,
+                    x,
+                    obj,
+                )
+            )
+
+        draw_list.sort(
+            key=lambda item: item[0]
+        )
+
+        for y, x, obj in draw_list:
+
+            sprite = pygame.transform.rotozoom(
+
+                obj.sprite,
+
+                obj.rotation,
+
+                obj.scale,
+
+            )
+
+            rect = sprite.get_rect(
+                center=(x, y)
+            )
+
+            surface.blit(
+                sprite,
+                rect,
+            )
