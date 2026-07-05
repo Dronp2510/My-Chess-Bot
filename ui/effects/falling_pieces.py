@@ -53,6 +53,11 @@ class FallingSystem:
 
         self.time = 0.0
 
+        self._transform_cache: dict[
+            tuple[int, int, int],
+            pygame.Surface,
+        ] = {}
+
     # --------------------------------------------------
 
     def resize(
@@ -63,6 +68,48 @@ class FallingSystem:
 
         self.width = width
         self.height = height
+
+    def _get_transformed(
+        self,
+        obj: FallingObject,
+    ) -> pygame.Surface:
+
+        angle = int(obj.rotation) % 360
+
+        scale_key = int(
+            obj.scale
+            * obj.base_scale
+            * 100
+        )
+
+        key = (
+            id(obj.sprite),
+            angle,
+            scale_key,
+        )
+
+        cached = self._transform_cache.get(key)
+
+        if cached is not None:
+            return cached
+
+        transformed = pygame.transform.rotozoom(
+
+            obj.sprite,
+
+            obj.rotation,
+
+            obj.scale
+            * obj.base_scale,
+
+        )
+
+        self._transform_cache[key] = transformed
+
+        if len(self._transform_cache) > 1500:
+            self._transform_cache.clear()
+
+        return transformed
 
     # --------------------------------------------------
 
@@ -205,18 +252,13 @@ class FallingSystem:
 
         for y, x, obj in draw_list:
 
-            sprite = pygame.transform.rotozoom(
+            sprite = self._get_transformed(obj)
 
-                obj.sprite,
+            rect = sprite.get_rect()
 
-                obj.rotation,
-
-                obj.scale * obj.base_scale,
-
-            )
-
-            rect = sprite.get_rect(
-                center=(x, y)
+            rect.center = (
+                round(x),
+                round(y),
             )
 
             surface.blit(

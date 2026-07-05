@@ -68,6 +68,15 @@ class OrbitSystem:
 
         self.objects: list[OrbitObject] = []
 
+        #
+        # Cached rotated sprites
+        #
+
+        self._transform_cache: dict[
+            tuple[int, int, int],
+            pygame.Surface,
+        ] = {}
+
     # --------------------------------------------------
 
     def set_center(self, center):
@@ -138,6 +147,51 @@ class OrbitSystem:
     def clear(self):
 
         self.objects.clear()
+    
+    def _get_transformed(
+        self,
+        obj: OrbitObject,
+        scale: float,
+    ) -> pygame.Surface:
+        """
+        Return a cached transformed sprite.
+
+        The cache key is intentionally quantized
+        so tiny floating-point changes don't
+        generate thousands of unique surfaces.
+        """
+
+        angle = int(obj.self_rotation) % 360
+
+        scale_key = int(scale * 100)
+
+        key = (
+            id(obj.sprite),
+            angle,
+            scale_key,
+        )
+
+        cached = self._transform_cache.get(key)
+
+        if cached is not None:
+            return cached
+
+        transformed = pygame.transform.rotozoom(
+            obj.sprite,
+            obj.self_rotation,
+            scale,
+        )
+
+        self._transform_cache[key] = transformed
+
+        #
+        # Prevent unlimited growth.
+        #
+
+        if len(self._transform_cache) > 1500:
+            self._transform_cache.clear()
+
+        return transformed
 
     # --------------------------------------------------
 
@@ -210,18 +264,16 @@ class OrbitSystem:
 
         for _, x, scale, obj in draw_list:
 
-            rotated = pygame.transform.rotozoom(
-
-                obj.sprite,
-
-                obj.self_rotation,
-
+            rotated = self._get_transformed(
+                obj,
                 scale,
-
             )
+            
+            rect = rotated.get_rect()
 
-            rect = rotated.get_rect(
-                center=(x, _)
+            rect.center = (
+                round(x),
+                round(y),
             )
 
             surface.blit(

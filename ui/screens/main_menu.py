@@ -115,6 +115,13 @@ class MainMenuScreen(Screen):
 
         self.chess_pieces = self._load_chess_pieces()
 
+        #
+        # Validate that every themed piece
+        # has been successfully loaded.
+        #
+
+        assert len(self.chess_pieces) == 12
+
 
     def on_first_enter(self):
 
