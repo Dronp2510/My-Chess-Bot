@@ -9,12 +9,6 @@ import pygame
 
 @dataclass(slots=True)
 class FallingObject:
-    """
-    Generic falling object.
-
-    Can represent chess pieces,
-    artifacts or future debris.
-    """
 
     sprite: pygame.Surface
 
@@ -33,6 +27,12 @@ class FallingObject:
     scale: float
 
     velocity_scale: float = 1.0
+
+    #
+    # Polish-1
+    #
+
+    base_scale: float = 1.0
 
 
 class FallingSystem:
@@ -70,10 +70,7 @@ class FallingSystem:
         self,
         sprite: pygame.Surface,
         *,
-        x: float | None = None,
-        y: float | None = None,
-        speed: float | None = None,
-        scale: float | None = None,
+        base_scale: float = 1.0,
     ):
 
         self.objects.append(
@@ -123,10 +120,11 @@ class FallingSystem:
                 ),
 
                 scale=self.random.uniform(
-                    0.6,
-                    1.1,
+                    0.70,
+                    1.10,
                 ),
 
+                base_scale=base_scale,
             )
         )
 
@@ -213,7 +211,7 @@ class FallingSystem:
 
                 obj.rotation,
 
-                obj.scale,
+                obj.scale * obj.base_scale,
 
             )
 

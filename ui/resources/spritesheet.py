@@ -35,8 +35,12 @@ class SpriteSheet:
     """
     Represents a loaded sprite sheet.
 
-    A SpriteSheet is simply a wrapper around a pygame.Surface
-    with helper methods for extracting frames.
+    Besides simple frame extraction, this class now supports
+    production-quality sprite processing including automatic
+    trimming and optional padding.
+
+    All expensive processing occurs once during loading and the
+    processed surfaces are cached by ChessPieceManager.
     """
 
     def __init__(self, image: pygame.Surface):
@@ -45,6 +49,65 @@ class SpriteSheet:
 
         self.width = image.get_width()
         self.height = image.get_height()
+
+    # ---------------------------------------------------------
+    # Internal Helpers
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _trim_alpha(
+        surface: pygame.Surface,
+    ) -> pygame.Surface:
+        """
+        Remove fully transparent borders.
+
+        Uses pygame's alpha bounding box detection.
+
+        If no visible pixels exist, the original
+        surface is returned.
+        """
+
+        rect = surface.get_bounding_rect()
+
+        if rect.width == 0 or rect.height == 0:
+            return surface
+
+        trimmed = pygame.Surface(
+            rect.size,
+            pygame.SRCALPHA,
+        )
+
+        trimmed.blit(
+            surface,
+            (0, 0),
+            rect,
+        )
+
+        return trimmed.convert_alpha()
+
+    @staticmethod
+    def _add_padding(
+        surface: pygame.Surface,
+        padding: int,
+    ) -> pygame.Surface:
+
+        if padding <= 0:
+            return surface
+
+        w = surface.get_width() + padding * 2
+        h = surface.get_height() + padding * 2
+
+        padded = pygame.Surface(
+            (w, h),
+            pygame.SRCALPHA,
+        )
+
+        padded.blit(
+            surface,
+            (padding, padding),
+        )
+
+        return padded.convert_alpha()
 
     # ---------------------------------------------------------
     # Single Frame
@@ -56,9 +119,23 @@ class SpriteSheet:
         y: int,
         width: int,
         height: int,
+        *,
+        trim: bool = False,
+        padding: int = 0,
     ) -> pygame.Surface:
         """
-        Extracts a single frame.
+        Extract a frame.
+
+        Parameters
+        ----------
+        trim:
+            Automatically remove transparent borders.
+
+        padding:
+            Re-add transparent padding after trimming.
+
+        These options are optional to preserve backwards
+        compatibility with existing callers.
         """
 
         surface = pygame.Surface(
@@ -69,10 +146,26 @@ class SpriteSheet:
         surface.blit(
             self.image,
             (0, 0),
-            pygame.Rect(x, y, width, height),
+            pygame.Rect(
+                x,
+                y,
+                width,
+                height,
+            ),
         )
 
-        return surface.convert_alpha()
+        surface = surface.convert_alpha()
+
+        if trim:
+            surface = self._trim_alpha(surface)
+
+        if padding:
+            surface = self._add_padding(
+                surface,
+                padding,
+            )
+
+        return surface
 
     # ---------------------------------------------------------
     # Grid Frame

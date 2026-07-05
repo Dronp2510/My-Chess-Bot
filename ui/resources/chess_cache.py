@@ -4,21 +4,21 @@
 
 """
 War Chess
-UI-2.A - Asset Pipeline
+UI-2.B Polish-1
 
-Chess Piece Cache
+Production Chess Piece Cache
 
 Responsibilities
 ----------------
-• Load chess piece textures
-• Cache loaded pieces
-• Validate piece names
-• Support themes
-• Support future skins
-• Provide a clean API for retrieving pieces
+• Load themed chess pieces
+• Automatically trim transparent borders
+• Normalize sprite sizes
+• Cache processed assets
+• Provide per-piece scaling
+• Prepare metadata for future renderers
 
 Game code should NEVER load chess textures directly.
-Always use ChessPieceManager.
+Always retrieve them through ChessPieceManager.
 """
 
 from __future__ import annotations
@@ -29,26 +29,23 @@ from pathlib import Path
 import pygame
 
 from .cache import asset_cache
-from .spritesheet import sprite_sheet_loader
 from .constants import (
     PIECE_COLORS,
     PIECE_NAMES,
 )
+from .spritesheet import sprite_sheet_loader
 
 
 # ============================================================
-# Chess Piece
+# Asset Metadata
 # ============================================================
 
 @dataclass(frozen=True, slots=True)
 class ChessPieceAsset:
-    """
-    Represents one chess piece asset.
-    """
-
     color: str
     piece: str
     surface: pygame.Surface
+    base_scale: float
 
 
 # ============================================================
@@ -70,36 +67,56 @@ class ChessPieceManager:
             / "Chess_pieces_1.png"
         )
 
+        # ----------------------------------------------------
+        # Large capture rectangles
         #
-        # Rectangle layout inside the atlas.
-        #
-        # Format:
-        # (x, y, width, height)
-        #
+        # These intentionally include surrounding transparent
+        # pixels. SpriteSheet trims them automatically.
+        # ----------------------------------------------------
 
         self.PIECE_RECTS = {
 
             "white": {
 
-                "king":   (35, 55, 150, 395),
-                "queen":  (250, 80, 150, 370),
-                "rook":   (495, 120, 150, 330),
-                "bishop": (730, 95, 145, 355),
-                "knight": (975, 90, 180, 360),
-                "pawn":   (1260, 180, 115, 270),
+                "king":   (20,   25, 190, 455),
+                "queen":  (220,  45, 210, 435),
+                "rook":   (455,  80, 205, 390),
+                "bishop": (690,  60, 205, 405),
+                "knight": (930,  45, 255, 435),
+                "pawn":   (1215, 135, 185, 345),
             },
 
             "black": {
 
-                "king":   (35, 565, 150, 395),
-                "queen":  (255, 590, 150, 370),
-                "rook":   (500, 630, 150, 330),
-                "bishop": (735, 605, 145, 355),
-                "knight": (975, 600, 180, 360),
-                "pawn":   (1260, 690, 115, 270),
+                "king":   (20,  535, 190, 455),
+                "queen":  (225, 555, 210, 435),
+                "rook":   (460, 590, 205, 390),
+                "bishop": (690, 570, 205, 405),
+                "knight": (930, 555, 255, 435),
+                "pawn":   (1215, 645, 185, 345),
             },
         }
 
+        # ----------------------------------------------------
+        # Optical scaling
+        #
+        # The renderer receives visually consistent pieces
+        # regardless of the artwork dimensions.
+        # ----------------------------------------------------
+
+        self.BASE_SCALE = {
+
+            "king":   1.00,
+            "queen":  0.97,
+            "rook":   0.91,
+            "bishop": 0.95,
+            "knight": 0.98,
+            "pawn":   0.82,
+        }
+
+    # --------------------------------------------------------
+    # Internal
+    # --------------------------------------------------------
 
     def _atlas(self):
 
@@ -110,16 +127,11 @@ class ChessPieceManager:
 
         return self.sheet
 
-
-    # --------------------------------------------------------
-    # Validation
-    # --------------------------------------------------------
-
     @staticmethod
     def _validate(
         color: str,
         piece: str,
-    ) -> None:
+    ):
 
         if color not in PIECE_COLORS:
             raise ValueError(
@@ -128,9 +140,8 @@ class ChessPieceManager:
 
         if piece not in PIECE_NAMES:
             raise ValueError(
-                f"Unknown chess piece: {piece}"
+                f"Unknown piece: {piece}"
             )
-
 
     # --------------------------------------------------------
     # Loading
@@ -150,15 +161,15 @@ class ChessPieceManager:
                 piece,
             )
 
-        sheet = self._atlas()
-
         x, y, w, h = self.PIECE_RECTS[color][piece]
 
-        surface = sheet.frame(
+        surface = self._atlas().frame(
             x,
             y,
             w,
             h,
+            trim=True,
+            padding=6,
         )
 
         asset_cache.store_piece(
@@ -170,22 +181,14 @@ class ChessPieceManager:
         return surface
 
     # --------------------------------------------------------
-    # Bulk Loading
+    # Bulk preload
     # --------------------------------------------------------
 
-    def preload(self) -> None:
-        """
-        Load every chess piece into memory.
-        """
+    def preload(self):
 
         for color in PIECE_COLORS:
-
             for piece in PIECE_NAMES:
-
-                self.load(
-                    color,
-                    piece,
-                )
+                self.load(color, piece)
 
     # --------------------------------------------------------
     # Lookup
@@ -226,10 +229,36 @@ class ChessPieceManager:
             piece,
         )
 
+        multiplier = self.BASE_SCALE[piece]
+
+        width = max(
+            1,
+            int(size[0] * multiplier),
+        )
+
+        height = max(
+            1,
+            int(size[1] * multiplier),
+        )
+
         return pygame.transform.smoothscale(
             surface,
-            size,
+            (
+                width,
+                height,
+            ),
         )
+
+    # --------------------------------------------------------
+    # Metadata
+    # --------------------------------------------------------
+
+    def get_base_scale(
+        self,
+        piece: str,
+    ) -> float:
+
+        return self.BASE_SCALE[piece]
 
     # --------------------------------------------------------
     # Theme
@@ -238,7 +267,7 @@ class ChessPieceManager:
     def set_theme(
         self,
         theme: str,
-    ) -> None:
+    ):
 
         self.theme = theme
 
@@ -246,12 +275,7 @@ class ChessPieceManager:
     # Cache
     # --------------------------------------------------------
 
-    def clear(self) -> None:
-        """
-        Remove cached chess pieces.
-
-        Does not clear textures from AssetLoader.
-        """
+    def clear(self):
 
         asset_cache.clear_pieces()
 

@@ -358,26 +358,47 @@ class MainMenuScreen(Screen):
 
         self.orbits.clear()
 
-        for _ in range(config.ORBIT_PIECE_COUNT):
+        colors = ("white", "black")
+        names = ("king", "queen", "rook", "bishop", "knight", "pawn")
 
-            pool = self._piece_pool()
+        assets = [
+            (color, piece)
+            for color in colors
+            for piece in names
+        ]
 
-            sprite = next(pool)
+        random.shuffle(assets)
 
-            self.orbits.add(sprite)
+        for i in range(config.ORBIT_PIECE_COUNT):
 
+            color, piece = assets[i % len(assets)]
+
+            self.orbits.add(
+                chess_piece_manager.get(color, piece),
+                base_scale=chess_piece_manager.get_base_scale(piece),
+            )
 
     def _populate_falling(self):
 
         self.falling.clear()
 
+        colors = ("white", "black")
+        names = ("king", "queen", "rook", "bishop", "knight", "pawn")
+
+        assets = [
+            (color, piece)
+            for color in colors
+            for piece in names
+        ]
+
         for _ in range(config.FALLING_PIECE_COUNT):
 
-            sprite = random.choice(
-                self.chess_pieces
-            )
+            color, piece = random.choice(assets)
 
-            self.falling.add(sprite)
+            self.falling.add(
+                chess_piece_manager.get(color, piece),
+                base_scale=chess_piece_manager.get_base_scale(piece),
+            )
 
     def _piece_pool(self):
 

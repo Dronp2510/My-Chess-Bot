@@ -12,10 +12,17 @@ from ui import config
 @dataclass(slots=True)
 class OrbitObject:
     """
-    Generic orbiting object.
+    Generic orbiting renderable.
 
-    Can represent a chess piece, artifact,
-    rune or any other sprite orbiting a center.
+    Designed to support any future sprite:
+        • Chess pieces
+        • Artifacts
+        • Boss icons
+        • Relics
+        • Ability icons
+
+    Rendering data lives here so OrbitSystem
+    remains completely asset-agnostic.
     """
 
     sprite: pygame.Surface
@@ -35,6 +42,17 @@ class OrbitObject:
     orbit_x_scale: float
 
     orbit_y_scale: float
+
+    #
+    # New (Polish-1)
+    #
+
+    base_scale: float = 1.0
+
+    min_scale: float = 0.65
+
+    max_scale: float = 1.00
+
 
 class OrbitSystem:
 
@@ -61,8 +79,9 @@ class OrbitSystem:
     def add(
         self,
         sprite: pygame.Surface,
+        *,
+        base_scale: float = 1.0,
     ):
-
 
         self.objects.append(
 
@@ -86,8 +105,8 @@ class OrbitSystem:
                 ),
 
                 rotation_speed=self.random.uniform(
-                    -18,
-                    18,
+                    -16,
+                    16,
                 ),
 
                 self_rotation=self.random.uniform(
@@ -100,14 +119,16 @@ class OrbitSystem:
                 ),
 
                 orbit_x_scale=self.random.uniform(
-                    0.85, 
-                    1.15
+                    0.88,
+                    1.12,
                 ),
 
                 orbit_y_scale=self.random.uniform(
-                    0.75,
-                    1.10
+                    0.82,
+                    1.08,
                 ),
+
+                base_scale=base_scale,
 
             )
         )
@@ -168,7 +189,13 @@ class OrbitSystem:
                 + 1
             ) * 0.5
 
-            scale = 0.65 + depth * 0.35
+            scale = (
+                obj.min_scale
+                + depth
+                * (obj.max_scale - obj.min_scale)
+            )
+
+            scale *= obj.base_scale
 
             draw_list.append(
                 (
