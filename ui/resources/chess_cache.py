@@ -29,9 +29,8 @@ from pathlib import Path
 import pygame
 
 from .cache import asset_cache
-from .loader import asset_loader
+from .spritesheet import sprite_sheet_loader
 from .constants import (
-    CHESS_ASSETS_DIR,
     PIECE_COLORS,
     PIECE_NAMES,
 )
@@ -62,6 +61,56 @@ class ChessPieceManager:
 
         self.theme = "default"
 
+        self.sheet = None
+
+        self.ATLAS_PATH = (
+            Path("Assets")
+            / "Generated_assets"
+            / "Themed_pieces"
+            / "Chess_pieces_1.png"
+        )
+
+        #
+        # Rectangle layout inside the atlas.
+        #
+        # Format:
+        # (x, y, width, height)
+        #
+
+        self.PIECE_RECTS = {
+
+            "white": {
+
+                "king":   (35, 55, 150, 395),
+                "queen":  (250, 80, 150, 370),
+                "rook":   (495, 120, 150, 330),
+                "bishop": (730, 95, 145, 355),
+                "knight": (975, 90, 180, 360),
+                "pawn":   (1260, 180, 115, 270),
+            },
+
+            "black": {
+
+                "king":   (35, 565, 150, 395),
+                "queen":  (255, 590, 150, 370),
+                "rook":   (500, 630, 150, 330),
+                "bishop": (735, 605, 145, 355),
+                "knight": (975, 600, 180, 360),
+                "pawn":   (1260, 690, 115, 270),
+            },
+        }
+
+
+    def _atlas(self):
+
+        if self.sheet is None:
+            self.sheet = sprite_sheet_loader.load(
+                self.ATLAS_PATH
+            )
+
+        return self.sheet
+
+
     # --------------------------------------------------------
     # Validation
     # --------------------------------------------------------
@@ -82,34 +131,6 @@ class ChessPieceManager:
                 f"Unknown chess piece: {piece}"
             )
 
-    # --------------------------------------------------------
-    # Path Resolution
-    # --------------------------------------------------------
-
-    def _piece_path(
-        self,
-        color: str,
-        piece: str,
-    ) -> Path:
-        """
-        Default naming convention:
-
-            Chess/
-                default/
-                    white/
-                        king.png
-                        queen.png
-                    black/
-                        king.png
-                        queen.png
-        """
-
-        return (
-            CHESS_ASSETS_DIR
-            / self.theme
-            / color
-            / f"{piece}.png"
-        )
 
     # --------------------------------------------------------
     # Loading
@@ -129,11 +150,15 @@ class ChessPieceManager:
                 piece,
             )
 
-        surface = asset_loader.load_texture(
-            self._piece_path(
-                color,
-                piece,
-            )
+        sheet = self._atlas()
+
+        x, y, w, h = self.PIECE_RECTS[color][piece]
+
+        surface = sheet.frame(
+            x,
+            y,
+            w,
+            h,
         )
 
         asset_cache.store_piece(
@@ -196,13 +221,13 @@ class ChessPieceManager:
         size: tuple[int, int],
     ) -> pygame.Surface:
 
-        path = self._piece_path(
+        surface = self.get(
             color,
             piece,
         )
 
-        return asset_loader.load_scaled_texture(
-            path,
+        return pygame.transform.smoothscale(
+            surface,
             size,
         )
 

@@ -34,13 +34,22 @@ class Button(Widget):
 
     def __init__(
         self,
-        rect: pygame.Rect,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
         text: str = "",
-        on_click: Optional[Callable[[], None]] = None,
+        on_click=None,
         enabled: bool = True,
         visible: bool = True,
     ) -> None:
-        super().__init__(rect)
+
+        super().__init__(
+            x,
+            y,
+            width,
+            height,
+        )
 
         self.text = text
 

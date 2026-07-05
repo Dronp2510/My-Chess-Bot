@@ -274,7 +274,7 @@ class MainMenuScreen(Screen):
 
         # Imported locally to avoid circular imports.
         from ui.widgets.panel import Panel
-        from ui.widgets.button import MenuButton
+        from ui.widgets.button import Button
 
         panel_width = 420
         panel_height = 520
@@ -303,7 +303,7 @@ class MainMenuScreen(Screen):
 
         for index, text in enumerate(labels):
 
-            button = MenuButton(
+            button = Button(
                 x=(panel_width - button_width) // 2,
                 y=start_y + index * spacing,
                 width=button_width,

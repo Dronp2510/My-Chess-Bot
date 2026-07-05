@@ -63,6 +63,9 @@ class Widget(Renderable):
 
         self.children: List["Widget"] = []
 
+        self.visible = True
+        self.enabled = True
+        
         self.animator = Animator()
 
         self.opacity = 255
@@ -194,6 +197,32 @@ class Widget(Renderable):
         for child in self.children:
             child.update(dt)
 
+    # ======================================================
+    # Event Handling
+    # ======================================================
+
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+    ) -> bool:
+        """
+        Dispatch an event to children.
+
+        Children are traversed in reverse order so the
+        visually top-most widget receives the event first.
+
+        Returns True if the event was consumed.
+        """
+
+        if not self.visible or not self.enabled:
+            return False
+
+        for child in reversed(self.children):
+            if child.handle_event(event):
+                return True
+
+        return False
+    
     # ======================================================
     # Rendering
     # ======================================================
