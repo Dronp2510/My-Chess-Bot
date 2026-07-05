@@ -84,7 +84,44 @@ class SpriteSheet:
         )
 
         return trimmed.convert_alpha()
+    
+    @staticmethod
+    def _remove_black_background(
+        surface: pygame.Surface,
+        *,
+        threshold: int = 18,
+    ) -> pygame.Surface:
+        """
+        Converts near-black background pixels into transparency.
 
+        This is intended for artwork exported on an opaque black
+        background while preserving the dark details of the pieces.
+
+        Any pixel whose RGB values are all <= threshold becomes
+        fully transparent.
+        """
+
+        result = surface.copy()
+
+        width, height = result.get_size()
+
+        for y in range(height):
+            for x in range(width):
+
+                r, g, b, a = result.get_at((x, y))
+
+                if (
+                    r <= threshold
+                    and g <= threshold
+                    and b <= threshold
+                ):
+                    result.set_at(
+                        (x, y),
+                        (0, 0, 0, 0),
+                    )
+
+        return result.convert_alpha()
+    
     @staticmethod
     def _add_padding(
         surface: pygame.Surface,
@@ -155,6 +192,15 @@ class SpriteSheet:
         )
 
         surface = surface.convert_alpha()
+
+        surface = surface.convert_alpha()
+
+        #
+        # The chess atlas ships with an opaque black background.
+        # Remove it before trimming.
+        #
+
+        surface = self._remove_black_background(surface)
 
         if trim:
             surface = self._trim_alpha(surface)

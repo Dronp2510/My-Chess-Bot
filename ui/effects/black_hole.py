@@ -29,7 +29,7 @@ class BlackHole:
     def __init__(
         self,
         center: tuple[int, int],
-        radius: float = config.BLACK_HOLE_RADIUS,
+        radius: float = config.BLACK_HOLE_RADIUS * 0.82,
     ):
 
         self.center = pygame.Vector2(center)
@@ -95,7 +95,7 @@ class BlackHole:
         # Outer Glow
         #
 
-        glow_radius = radius * 2.3
+        glow_radius = radius * 2.0
 
         glow = pygame.Surface(
             (
@@ -107,7 +107,7 @@ class BlackHole:
 
         pygame.draw.circle(
             glow,
-            (90, 40, 170, 25),
+            (90, 40, 170, 18),
             (
                 int(glow_radius),
                 int(glow_radius),
@@ -117,7 +117,7 @@ class BlackHole:
 
         pygame.draw.circle(
             glow,
-            (150, 70, 220, 18),
+            (150, 70, 220, 12),
             (
                 int(glow_radius),
                 int(glow_radius),
@@ -150,7 +150,7 @@ class BlackHole:
             int(radius * 2),
         )
 
-        for angle in range(0, 360, 10):
+        for angle in range(0, 360, 14):
 
             theta = math.radians(
                 angle + self.rotation

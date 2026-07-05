@@ -104,8 +104,8 @@ class OrbitSystem:
                 ),
 
                 radius=self.random.uniform(
-                    config.ORBIT_MIN_RADIUS,
-                    config.ORBIT_MAX_RADIUS,
+                    config.ORBIT_MIN_RADIUS + 35,
+                    config.ORBIT_MAX_RADIUS + 60,
                 ),
 
                 orbit_speed=self.random.uniform(
