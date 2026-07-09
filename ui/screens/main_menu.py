@@ -235,7 +235,7 @@ class MainMenuScreen(Screen):
         #
 
         for widget in self.widgets:
-            widget.draw(surface)
+            widget.render(surface)
 
     # -----------------------------------------------------
 

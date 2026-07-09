@@ -10,7 +10,7 @@ Features
 - Disabled state
 - Mouse enter/leave callbacks
 - Click callback
-- Future keyboard focus support
+- Parent-aware coordinates
 - Animation-ready
 """
 
@@ -28,8 +28,9 @@ class Button(Widget):
     """
     Base interactive button.
 
-    Rendering is intentionally generic. Visual styling comes from
-    subclasses or sprite-sheet skins.
+    Rendering is intentionally generic.
+    Visual styling will later come from
+    sprite-sheet skins.
     """
 
     def __init__(
@@ -67,20 +68,22 @@ class Button(Widget):
         self.on_hover_enter: Optional[Callable[[], None]] = None
         self.on_hover_exit: Optional[Callable[[], None]] = None
 
-    # ------------------------------------------------------------------
+        #
+        # Temporary font.
+        # Later this will come from the asset pipeline.
+        #
+        self.font = pygame.font.SysFont(
+            "arial",
+            28,
+            bold=True,
+        )
+
+    # ======================================================
     # State
-    # ------------------------------------------------------------------
+    # ======================================================
 
     @property
     def state(self) -> str:
-        """
-        Returns current visual state.
-
-        disabled
-        pressed
-        hover
-        idle
-        """
 
         if not self.enabled:
             return "disabled"
@@ -93,14 +96,15 @@ class Button(Widget):
 
         return "idle"
 
-    # ------------------------------------------------------------------
+    # ======================================================
     # Public API
-    # ------------------------------------------------------------------
+    # ======================================================
 
     def enable(self) -> None:
         self.enabled = True
 
     def disable(self) -> None:
+
         self.enabled = False
         self.hovered = False
         self.pressed = False
@@ -109,45 +113,63 @@ class Button(Widget):
         self,
         callback: Optional[Callable[[], None]],
     ) -> None:
+
         self.on_click = callback
 
-    # ------------------------------------------------------------------
+    # ======================================================
     # Events
-    # ------------------------------------------------------------------
+    # ======================================================
 
-    def handle_event(self, event: pygame.event.Event) -> bool:
-        """
-        Returns True if the event was consumed.
-        """
+    def handle_event(
+        self,
+        event: pygame.event.Event,
+    ) -> bool:
+
+        #
+        # Give children first chance.
+        #
+
+        if super().handle_event(event):
+            return True
 
         if not self.enabled or not self.visible:
             return False
 
+        rect = self.global_rect
+
         if event.type == pygame.MOUSEMOTION:
+
             was_hovered = self.hovered
 
-            self.hovered = self.rect.collidepoint(event.pos)
+            self.hovered = rect.collidepoint(event.pos)
 
             if self.hovered and not was_hovered:
+
                 if self.on_hover_enter:
                     self.on_hover_enter()
 
             elif was_hovered and not self.hovered:
+
                 if self.on_hover_exit:
                     self.on_hover_exit()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
+
             if event.button == 1 and self.hovered:
+
                 self.pressed = True
                 return True
 
         elif event.type == pygame.MOUSEBUTTONUP:
+
             if event.button == 1:
+
                 clicked = self.pressed and self.hovered
 
                 self.pressed = False
 
                 if clicked:
+
                     if self.on_click:
                         self.on_click()
 
@@ -155,23 +177,25 @@ class Button(Widget):
 
         return False
 
-    # ------------------------------------------------------------------
+    # ======================================================
     # Update
-    # ------------------------------------------------------------------
+    # ======================================================
 
-    def update(self, dt: float) -> None:
-        self.animator.update(dt)
+    def update(
+        self,
+        dt: float,
+    ) -> None:
 
-    # ------------------------------------------------------------------
+        super().update(dt)
+
+    # ======================================================
     # Draw
-    # ------------------------------------------------------------------
+    # ======================================================
 
-    def draw(self, surface: pygame.Surface) -> None:
-        """
-        Placeholder rendering.
-
-        Production rendering will use button sprite sheets.
-        """
+    def draw(
+        self,
+        surface: pygame.Surface,
+    ) -> None:
 
         if not self.visible:
             return
@@ -183,17 +207,36 @@ class Button(Widget):
             "disabled": (35, 35, 35),
         }
 
+        rect = self.global_rect
+
         pygame.draw.rect(
             surface,
             colors[self.state],
-            self.rect,
+            rect,
             border_radius=8,
         )
 
         pygame.draw.rect(
             surface,
             (180, 180, 180),
-            self.rect,
+            rect,
             width=2,
             border_radius=8,
         )
+
+        if self.text:
+
+            text_surface = self.font.render(
+                self.text,
+                True,
+                (235, 235, 235),
+            )
+
+            text_rect = text_surface.get_rect(
+                center=rect.center
+            )
+
+            surface.blit(
+                text_surface,
+                text_rect,
+            )

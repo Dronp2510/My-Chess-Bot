@@ -6,17 +6,6 @@ Base widget class for the War Chess UI framework.
 
 Every visible UI component inherits from Widget.
 
-Examples
---------
-Widget
- ├── Panel
- ├── Label
- ├── Image
- ├── Button
- ├── IconButton
- ├── AnimatedSprite
- └── GlowFrame
-
 Responsibilities
 ----------------
 • Position & Size
@@ -25,7 +14,7 @@ Responsibilities
 • Parent / Child hierarchy
 • Rendering
 • Updating
-• Event hooks
+• Event propagation
 • Animation registration
 """
 
@@ -60,24 +49,21 @@ class Widget(Renderable):
         self.rect = pygame.Rect(x, y, width, height)
 
         self.parent: Optional["Widget"] = None
-
         self.children: List["Widget"] = []
 
         self.visible = True
         self.enabled = True
-        
+
         self.animator = Animator()
 
         self.opacity = 255
-
         self.scale = 1.0
-
         self.rotation = 0.0
 
         self.name = self.__class__.__name__
 
     # ======================================================
-    # Position Properties
+    # Position
     # ======================================================
 
     @property
@@ -129,6 +115,31 @@ class Widget(Renderable):
         self.rect.size = value
 
     # ======================================================
+    # Global Geometry
+    # ======================================================
+
+    @property
+    def global_position(self) -> tuple[int, int]:
+
+        if self.parent is None:
+            return self.rect.topleft
+
+        px, py = self.parent.global_position
+
+        return (
+            px + self.rect.x,
+            py + self.rect.y,
+        )
+
+    @property
+    def global_rect(self) -> pygame.Rect:
+
+        rect = self.rect.copy()
+        rect.topleft = self.global_position
+
+        return rect
+
+    # ======================================================
     # Hierarchy
     # ======================================================
 
@@ -162,11 +173,9 @@ class Widget(Renderable):
     # ======================================================
 
     def show(self) -> None:
-
         self.visible = True
 
     def hide(self) -> None:
-
         self.visible = False
 
     # ======================================================
@@ -174,11 +183,9 @@ class Widget(Renderable):
     # ======================================================
 
     def enable(self) -> None:
-
         self.enabled = True
 
     def disable(self) -> None:
-
         self.enabled = False
 
     # ======================================================
@@ -186,9 +193,9 @@ class Widget(Renderable):
     # ======================================================
 
     def update(self, dt: float) -> None:
-        """
-        Updates this widget and all of its children.
-        """
+
+        if not self.visible:
+            return
 
         self.animator.update(dt)
 
@@ -205,34 +212,27 @@ class Widget(Renderable):
         self,
         event: pygame.event.Event,
     ) -> bool:
-        """
-        Dispatch an event to children.
-
-        Children are traversed in reverse order so the
-        visually top-most widget receives the event first.
-
-        Returns True if the event was consumed.
-        """
 
         if not self.visible or not self.enabled:
             return False
 
         for child in reversed(self.children):
+
             if child.handle_event(event):
                 return True
 
         return False
-    
+
     # ======================================================
     # Rendering
     # ======================================================
 
-    def render(self, surface: pygame.Surface) -> None:
-        """
-        Draw this widget and then its children.
-        """
+    def render(
+        self,
+        surface: pygame.Surface,
+    ) -> None:
 
-        if not self.is_visible:
+        if not self.visible:
             return
 
         self.draw(surface)
@@ -240,41 +240,11 @@ class Widget(Renderable):
         for child in self.children:
             child.render(surface)
 
-    @property
-    def global_position(self) -> tuple[int, int]:
-        """
-        Position in screen space.
-
-        Parent transforms are accumulated.
-        """
-
-        if self.parent is None:
-            return self.position
-
-        px, py = self.parent.global_position
-
-        return (
-            px + self.x,
-            py + self.y,
-        )
-
-    @property
-    def global_rect(self) -> pygame.Rect:
-
-        rect = self.rect.copy()
-
-        rect.topleft = self.global_position
-
-        return rect
-
     # ======================================================
-    # Animation Helpers
+    # Animation
     # ======================================================
 
     def animate(self, animation):
-        """
-        Register an animation on this widget.
-        """
 
         return self.animator.add(animation)
 
@@ -283,13 +253,10 @@ class Widget(Renderable):
         self.animator.clear()
 
     # ======================================================
-    # Event Hooks
+    # Hooks
     # ======================================================
 
     def on_update(self, dt: float) -> None:
-        """
-        Override in subclasses.
-        """
         pass
 
     def on_mouse_enter(self) -> None:
@@ -311,12 +278,10 @@ class Widget(Renderable):
     # Drawing
     # ======================================================
 
-    def draw(self, surface: pygame.Surface) -> None:
-        """
-        Override in subclasses.
-
-        Widget itself draws nothing.
-        """
+    def draw(
+        self,
+        surface: pygame.Surface,
+    ) -> None:
         pass
 
     # ======================================================
