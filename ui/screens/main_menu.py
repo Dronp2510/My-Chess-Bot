@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pygame
 import random
+from pathlib import Path
 
 from ui.screen import Screen
 from ui import config
@@ -16,6 +17,7 @@ from ui.backgrounds import (
 from ui.effects.black_hole import BlackHole
 from ui.effects.orbit_system import OrbitSystem
 from ui.effects.falling_pieces import FallingSystem
+from ui.assets import Assets
 
 from ui.resources.chess_cache import chess_piece_manager
 
@@ -101,6 +103,20 @@ class MainMenuScreen(Screen):
 
         self.buttons = []
 
+        #
+        # UI assets
+        #
+        self.ui_frame = None
+
+        #
+        # All themed button skins.
+        # Key = button name
+        # Value = ButtonSkin
+        #
+        self.button_skins: dict[str, object] = {}
+
+        self._load_ui_assets()
+
         self._build_ui()
 
         # -------------------------------------------------
@@ -177,8 +193,8 @@ class MainMenuScreen(Screen):
 
         if self.menu_panel:
 
-            panel_width = 420
-            panel_height = 520
+            panel_width = 558
+            panel_height = 447
 
             self.menu_panel.rect.x = 70
             self.menu_panel.rect.y = (
@@ -270,6 +286,79 @@ class MainMenuScreen(Screen):
 
         return self.black_hole.position
 
+    def _load_ui_assets(self):
+        """
+        Load all UI assets used by the main menu.
+
+        This method is called once during screen
+        initialization.
+        """
+
+        project_root = Path(__file__).resolve().parents[2]
+
+        #
+        # -------------------------------------------------
+        # Frame
+        # -------------------------------------------------
+        #
+
+        frame_path = (
+            project_root
+            / "Assets"
+            / "Generated_assets"
+            / "UI"
+            / "Frame"
+            / "frame.png"
+        )
+
+        self.ui_frame = Assets.texture(frame_path)
+
+        #
+        # -------------------------------------------------
+        # Buttons
+        # -------------------------------------------------
+        #
+
+        button_names = (
+            "play",
+            "load_game",
+            "settings",
+            "exit",
+        )
+
+        button_root = (
+            project_root
+            / "Assets"
+            / "Generated_assets"
+            / "UI"
+            / "Buttons"
+        )
+
+        for button_name in button_names:
+
+            self.button_skins[button_name] = Assets.load_button_images(
+
+                name=f"main_menu_{button_name}",
+
+                idle=(
+                    button_root
+                    / "Idle"
+                    / f"{button_name}.png"
+                ),
+
+                hover=(
+                    button_root
+                    / "Hover"
+                    / f"{button_name}.png"
+                ),
+
+                pressed=(
+                    button_root
+                    / "Pressed"
+                    / f"{button_name}.png"
+                ),
+            )
+
 
     def _build_ui(self):
         """
@@ -283,14 +372,18 @@ class MainMenuScreen(Screen):
         from ui.widgets.panel import Panel
         from ui.widgets.button import Button
 
-        panel_width = 420
-        panel_height = 520
+        #
+        # Use the artwork aspect ratio.
+        #
+        panel_width = 558
+        panel_height = 447
 
         self.menu_panel = Panel(
             x=70,
             y=self.height // 2 - panel_height // 2,
             width=panel_width,
             height=panel_height,
+            background_image=self.ui_frame,
         )
 
         labels = (
@@ -300,22 +393,33 @@ class MainMenuScreen(Screen):
             "Exit",
         )
 
-        button_width = 300
-        button_height = 70
+        #
+        # Tuned for the new frame artwork.
+        #
 
-        start_y = 110
-        spacing = 88
+        button_width = 320
+        button_height = 150
+
+        start_y = 35
+        spacing = 92
 
         self.buttons.clear()
 
         for index, text in enumerate(labels):
+
+            #
+            # Only the Play button is themed.
+            #
+
+            skin = self.button_skins.get(text.lower().replace(" ", "_"))
 
             button = Button(
                 x=(panel_width - button_width) // 2,
                 y=start_y + index * spacing,
                 width=button_width,
                 height=button_height,
-                text=text,
+                text="" if skin else text,
+                skin=skin,
             )
 
             self.menu_panel.add_child(button)

@@ -41,6 +41,7 @@ class Panel(Widget):
         border_color=(180, 180, 180),
         border_width: int = 2,
         border_radius: int = 8,
+        background_image: pygame.Surface | None = None,
         layer: RenderLayer = RenderLayer.UI,
     ) -> None:
 
@@ -62,6 +63,21 @@ class Panel(Widget):
 
         self.surface: Optional[pygame.Surface] = None
 
+        #
+        # Optional themed frame image.
+        #
+        self.background_image = background_image
+
+        #
+        # Cached scaled frame.
+        #
+        self._scaled_background: Optional[pygame.Surface] = None
+
+        #
+        # Size used for cached scaling.
+        #
+        self._cached_background_size = (width, height)
+
         self._dirty = True
 
     # ---------------------------------------------------------
@@ -75,11 +91,59 @@ class Panel(Widget):
 
         self._dirty = True
 
+    def set_background_image(
+        self,
+        image: pygame.Surface | None,
+    ) -> None:
+        """
+        Assign or remove a themed panel image.
+        """
+
+        self.background_image = image
+
+        self._scaled_background = None
+
+        self.invalidate()
+
+    def _rebuild_background_cache(self) -> None:
+        """
+        Rebuilds the scaled frame image.
+        """
+
+        if self.background_image is None:
+            return
+
+        self._scaled_background = pygame.transform.smoothscale(
+            self.background_image,
+            (self.width, self.height),
+        )
+
+        self._cached_background_size = (
+            self.width,
+            self.height,
+        )
+
     def _rebuild_surface(self) -> None:
         """
         Rebuilds the cached panel surface.
         """
 
+        #
+        # Resize changed?
+        #
+
+        if (
+            self.background_image is not None
+            and (
+                self._scaled_background is None
+                or self._cached_background_size != (
+                    self.width,
+                    self.height,
+                )
+            )
+        ):
+            self._rebuild_background_cache()
+        
         if self.width <= 0 or self.height <= 0:
             return
 
@@ -117,6 +181,43 @@ class Panel(Widget):
         self,
         surface: pygame.Surface,
     ) -> None:
+
+        #
+        # -----------------------------------------------------
+        # Themed Panel Rendering
+        # -----------------------------------------------------
+        #
+
+        if self.background_image is not None:
+
+            #
+            # Panel resized?
+            #
+
+            if (
+                self._scaled_background is None
+                or self._cached_background_size != (
+                    self.width,
+                    self.height,
+                )
+            ):
+                self._rebuild_background_cache()
+
+            if self._scaled_background is not None:
+
+                surface.blit(
+                    self._scaled_background,
+                    self.global_position,
+                )
+
+            return
+
+        #
+        # -----------------------------------------------------
+        # Fallback Rendering
+        # (Current placeholder implementation)
+        # -----------------------------------------------------
+        #
 
         if self._dirty or self.surface is None:
             self._rebuild_surface()
