@@ -21,6 +21,7 @@ pygame.init()
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ASSET_CANDIDATES = [
+    PROJECT_ROOT / "Assets" / "Classic",
     PROJECT_ROOT / "Assets",
     PROJECT_ROOT / "assets",
 ]
@@ -120,7 +121,7 @@ def resolve_asset_path(piece_name: str) -> Path:
             return candidate
 
     # Keep a last-resort fallback for older local setups.
-    legacy = Path(r"D:/Miscelleneous/VisualStudio/My Chess Bot/My Chess Bot/Assets") / f"{piece_name}.png"
+    legacy = Path(r"D:/Miscelleneous/VisualStudio/My Chess Bot/My Chess Bot/Assets/Classic") / f"{piece_name}.png"
     return legacy
 
 def opponent(color: str) -> str:

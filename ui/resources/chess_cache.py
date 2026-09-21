@@ -57,11 +57,17 @@ class ChessPieceManager:
 
         self.theme = "default"
 
-        self.PIECE_DIRECTORY = (
-            Path("Assets")
-            / "Generated_assets"
-            / "Themed_pieces"
-        )
+        self.PROJECT_ROOT = Path(__file__).resolve().parents[2]
+        self.PIECE_DIRECTORY = self.PROJECT_ROOT / "Assets" / "Classic"
+
+        self.PIECE_CODES = {
+            "king": "k",
+            "queen": "q",
+            "rook": "r",
+            "bishop": "b",
+            "knight": "kn",
+            "pawn": "p",
+        }
 
         # ----------------------------------------------------
         # Piece metadata
@@ -75,32 +81,32 @@ class ChessPieceManager:
             "white": {
 
                 "king": {
-                    "filename": "White_king.png",
+                    "filename": "wk.png",
                     "scale": 0.50,
                 },
 
                 "queen": {
-                    "filename": "White_queen.png",
+                    "filename": "wq.png",
                     "scale": 0.48,
                 },
 
                 "rook": {
-                    "filename": "White_rook.png",
+                    "filename": "wr.png",
                     "scale": 0.42,
                 },
 
                 "bishop": {
-                    "filename": "White_bishop.png",
+                    "filename": "wb.png",
                     "scale": 0.44,
                 },
 
                 "knight": {
-                    "filename": "White_knight.png",
+                    "filename": "wkn.png",
                     "scale": 0.46,
                 },
 
                 "pawn": {
-                    "filename": "White_pawn.png",
+                    "filename": "wp.png",
                     "scale": 0.34,
                 },
             },
@@ -108,32 +114,32 @@ class ChessPieceManager:
             "black": {
 
                 "king": {
-                    "filename": "Black_king.png",
+                    "filename": "bk.png",
                     "scale": 0.50,
                 },
 
                 "queen": {
-                    "filename": "Black_queen.png",
+                    "filename": "bq.png",
                     "scale": 0.48,
                 },
 
                 "rook": {
-                    "filename": "Black_rook.png",
+                    "filename": "br.png",
                     "scale": 0.42,
                 },
 
                 "bishop": {
-                    "filename": "Black_bishop.png",
+                    "filename": "bb.png",
                     "scale": 0.44,
                 },
 
                 "knight": {
-                    "filename": "Black_knight.png",
+                    "filename": "bkn.png",
                     "scale": 0.46,
                 },
 
                 "pawn": {
-                    "filename": "Black_pawn.png",
+                    "filename": "bp.png",
                     "scale": 0.34,
                 },
             },
@@ -178,16 +184,13 @@ class ChessPieceManager:
         piece: str,
     ) -> Path:
         """
-        Returns the absolute path to a themed chess piece.
+        Returns the absolute path to a chess piece in the Classic asset pack.
         """
 
-        filename = self.PIECE_METADATA[color][piece]["filename"]
+        color_key = "w" if color == "white" else "b"
+        piece_key = self.PIECE_CODES[piece]
 
-        return (
-            self.PIECE_DIRECTORY
-            / color
-            / filename
-        )
+        return self.PIECE_DIRECTORY / f"{color_key}{piece_key}.png"
 
     # --------------------------------------------------------
     # Loading
@@ -342,7 +345,8 @@ class ChessPieceManager:
             piece,
         )
 
-        return self.PIECE_METADATA[color][piece]["filename"]
+        color_key = "w" if color == "white" else "b"
+        return f"{color_key}{self.PIECE_CODES[piece]}.png"
 
     # --------------------------------------------------------
     # Theme
