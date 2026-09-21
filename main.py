@@ -530,4 +530,9 @@ def start_chess_battle(player_color="w"):
         clock.tick(60)
 
 if __name__ == "__main__":
-    start_chess_battle("w")
+    # The legacy battle helpers above remain available to older callers.  The
+    # normal entry point now launches the campaign flow, which starts this
+    # same GameState/bot backend when a map node is selected.
+    from ui.new_ui import run
+
+    run()
